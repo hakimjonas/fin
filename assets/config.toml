@@ -1,6 +1,7 @@
 title = "HyprPower"
 columns = 2
-stylesheet = "src/style.css"
+stylesheet = "style.css"
+use_system_theme = false # Set to true to use the system GTK4 theme
 
 [[buttons]]
 label = "" # Lock icon

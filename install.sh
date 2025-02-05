@@ -11,7 +11,7 @@ cargo build --release
 # 2. Define install locations (merged /usr style)
 ##
 INSTALL_BIN_DIR="/usr/bin"
-INSTALL_SHARE_DIR="/usr/share/hyprlauncher"
+INSTALL_SHARE_DIR="/usr/share/hyprpower"
 
 echo "Using install dirs:"
 echo "  Binaries: $INSTALL_BIN_DIR"
@@ -23,15 +23,15 @@ sudo mkdir -p "$INSTALL_SHARE_DIR"
 
 ##
 # 3. Copy the binary
-#    (If your Cargo package/binary name isn't 'hyprlauncher',
+#    (If your Cargo package/binary name isn't 'hyprpower',
 #     update LAUNCHER_BIN accordingly.)
 ##
-LAUNCHER_BIN="target/release/hyprlauncher"
+LAUNCHER_BIN="target/release/hyprpower"
 echo "Installing $LAUNCHER_BIN -> $INSTALL_BIN_DIR"
 sudo cp "$LAUNCHER_BIN" "$INSTALL_BIN_DIR/"
 
 # Optionally, make sure it's executable:
-sudo chmod 755 "$INSTALL_BIN_DIR/hyprlauncher"
+sudo chmod 755 "$INSTALL_BIN_DIR/hyprpower"
 
 ##
 # 4. Copy default config and stylesheet
@@ -43,7 +43,7 @@ sudo cp assets/style.css   "$INSTALL_SHARE_DIR/style.css"
 
 echo "Installation complete!"
 echo ""
-echo "You can now run 'hyprlauncher' from the terminal."
+echo "You can now run 'hyprpower' from the terminal."
 echo "Default config is at: $INSTALL_SHARE_DIR/config.toml"
 echo "Default stylesheet is at: $INSTALL_SHARE_DIR/style.css"
 echo "User overrides, if any, go in ~/.config/hyprpower/ (for config) or whichever path is set in config."
