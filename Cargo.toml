@@ -1,0 +1,12 @@
+[package]
+name = "hyprpower"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+im = "15.1.0"
+serde = { version = "1.0.217", features = ["derive"] }
+toml = "0.8.19"
+gtk4 = "0.9.5"
+glib = "0.20.7"
+anyhow = "1.0"

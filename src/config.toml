@@ -1,0 +1,19 @@
+title = "HyprPower"
+columns = 2
+stylesheet = "src/style.css"
+
+[[buttons]]
+label = "" # Lock icon
+command = "hyprctl dispatch exec hyprlock"
+
+[[buttons]]
+label = "󰩈" # Logout icon
+command = "hyprctl dispatch exit"
+
+[[buttons]]
+label = "󰑓" # Reboot icon
+command = "systemctl reboot"
+
+[[buttons]]
+label = "" # Shutdown icon
+command = "systemctl poweroff"
