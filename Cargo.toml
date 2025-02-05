@@ -10,3 +10,10 @@ toml = "0.8.19"
 gtk4 = "0.9.5"
 glib = "0.20.7"
 anyhow = "1.0"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "unwind"    # Keep standard stack traces
+strip = "symbols"   # Trim symbol tables

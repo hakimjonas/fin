@@ -34,21 +34,28 @@ where
 /// Configuration for the launcher application.
 #[derive(Deserialize, Debug)]
 struct Config {
+    /// Window title.
     title: String,
+    /// Number of columns in the button grid.
     columns: usize,
+    /// Button configurations.
     #[serde(deserialize_with = "deserialize_vector")]
     buttons: Vector<ButtonConfig>,
+    /// Path to the CSS stylesheet.
     stylesheet: String,
 }
 
 /// Configuration for an individual button.
 #[derive(Deserialize, Debug, Clone)]
 struct ButtonConfig {
+    /// Label displayed on the button (text or icon glyph).
     label: String,
+    /// Shell command executed when the button is clicked.
     command: String,
 }
 
 fn main() {
+    // Exit with an appropriate code on error
     std::process::exit(match run() {
         Ok(()) => 0,
         Err(e) => {
@@ -58,24 +65,33 @@ fn main() {
     });
 }
 
-/// The main entry point, wraps up error handling via anyhow.
+/// Main entry point, wraps up error handling via anyhow.
 fn run() -> Result<()> {
-    let args: Vector<String> = env::args().collect();
-    let config_path = if let Some(path) = args.get(1) {
-        PathBuf::from(path)
+    // Gather arguments
+    let args: Vec<String> = env::args().collect();
+    // or use `im::Vector` if you prefer
+
+    // 1) If user passed a path, use that
+    // 2) else if LAUNCHER_CONFIG_PATH is set, use that
+    // 3) else fallback to find_config_path()
+    let config_path = if args.len() > 1 {
+        PathBuf::from(&args[1])
     } else if let Ok(env_path) = env::var("LAUNCHER_CONFIG_PATH") {
         PathBuf::from(env_path)
     } else {
-        default_config_path()
+        find_config_path()
     };
 
+    // Load config
     let config = load_config(&config_path)
         .with_context(|| format!("Failed to load configuration from {:?}", config_path))?;
 
+    // Create the GTK application
     let app = Application::builder()
         .application_id("com.hyprpower.launcher")
         .build();
 
+    // When the application is activated, build the UI
     app.connect_activate(move |app| {
         if let Err(e) = build_ui(app, &config) {
             eprintln!("Error building UI: {:?}", e);
@@ -83,30 +99,40 @@ fn run() -> Result<()> {
         }
     });
 
+    // Launch the application
     app.run();
     Ok(())
 }
 
-/// Returns a default configuration path, following XDG Base Directory, if available.
-fn default_config_path() -> PathBuf {
+/// Returns the configuration path, checking user-specific and system-wide locations.
+fn find_config_path() -> PathBuf {
+    // 1. Check user config in ~/.config/hyprpower/config.toml
     if let Ok(xdg_config_home) = env::var("XDG_CONFIG_HOME") {
-        Path::new(&xdg_config_home)
+        let user_config = Path::new(&xdg_config_home)
             .join("hyprpower")
-            .join("config.toml")
+            .join("config.toml");
+        if user_config.exists() {
+            return user_config;
+        }
     } else if let Ok(home) = env::var("HOME") {
-        Path::new(&home)
+        let user_config = Path::new(&home)
             .join(".config")
             .join("hyprpower")
-            .join("config.toml")
-    } else {
-        PathBuf::from("config.toml")
+            .join("config.toml");
+        if user_config.exists() {
+            return user_config;
+        }
     }
+
+    // 2. Fallback to system-wide default: /usr/share/hyprlauncher/config.toml
+    Path::new("/usr/share/hyprlauncher").join("config.toml")
 }
 
 /// Loads and parses the configuration file from the given path.
 fn load_config(path: &Path) -> Result<Config> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Could not read config file {:?}", path))?;
+
     toml::from_str(&content).context("TOML deserialization error")
 }
 
@@ -116,6 +142,7 @@ fn create_action_button(app: &Application, label: &str, command: &str) -> Button
     let command_string = command.to_string();
     let app = app.clone();
 
+    // When the button is clicked, run the command in a shell, then quit the app
     button.connect_clicked(move |_| {
         if !command_string.is_empty() {
             if let Err(e) = Command::new("sh").arg("-c").arg(&command_string).spawn() {
@@ -137,34 +164,15 @@ fn build_ui(app: &Application, config: &Config) -> Result<()> {
         .default_height(400)
         .build();
 
+    // Hide window decorations (title bar, etc.)
     window.set_decorated(false);
+    // Make it non-resizable
     window.set_resizable(false);
-    window.set_modal(true);
-    window.present();
 
-    if let Some(parent_window) = app.active_window() {
-        if parent_window != window {
-            window.set_transient_for(Some(&parent_window));
-        }
-    }
-
-    if let Err(e) = Command::new("hyprctl")
-        .arg("dispatch")
-        .arg("togglefloating")
-        .spawn()
-    {
-        eprintln!("Warning: Failed to toggle floating window: {}", e);
-    }
-    if let Err(e) = Command::new("hyprctl")
-        .arg("dispatch")
-        .arg("centerwindow")
-        .spawn()
-    {
-        eprintln!("Warning: Failed to center window: {}", e);
-    }
-
+    // Load the CSS stylesheet
     load_css(&config.stylesheet)?;
 
+    // Create a grid layout where each column & row is homogeneous
     let grid = Grid::builder()
         .column_homogeneous(true)
         .row_homogeneous(true)
@@ -176,6 +184,7 @@ fn build_ui(app: &Application, config: &Config) -> Result<()> {
         .margin_end(20)
         .build();
 
+    // Attach each button in row-major order
     for (index, button_config) in config.buttons.iter().enumerate() {
         let button = create_action_button(app, &button_config.label, &button_config.command);
         let col = (index % config.columns) as i32;
@@ -183,9 +192,11 @@ fn build_ui(app: &Application, config: &Config) -> Result<()> {
         grid.attach(&button, col, row, 1, 1);
     }
 
+    // Add the grid to the window
     window.set_child(Some(&grid));
-    window.show();
+    window.present();
 
+    // Collect all buttons to set up custom keyboard navigation
     let children: Vector<_> =
         std::iter::successors(grid.first_child(), |child| child.next_sibling()).collect();
     let buttons: Vector<Button> = children
@@ -211,6 +222,7 @@ fn load_css(css_path: &str) -> Result<()> {
     let display =
         Display::default().ok_or_else(|| anyhow::anyhow!("Could not get default display"))?;
 
+    // Apply the CSS to the app
     gtk4::style_context_add_provider_for_display(
         &display,
         &provider,
@@ -227,15 +239,19 @@ fn setup_key_handlers(
     buttons: Vector<Button>,
     columns: usize,
 ) {
+    // Let the window accept focus and request it
     window.set_can_focus(true);
     window.grab_focus();
 
+    // Track the current focused button index
     let current_index = Rc::new(Cell::new(0));
 
+    // Focus the first button if available
     if let Some(first_button) = buttons.get(0) {
         first_button.grab_focus();
     }
 
+    // Create a key event controller
     let controller = EventControllerKey::new();
 
     controller.connect_key_pressed({
@@ -244,48 +260,59 @@ fn setup_key_handlers(
         let current_index = current_index.clone();
 
         move |_, keyval, _hardware_keycode, state| {
-            let count = buttons.len();
+            let total_buttons = buttons.len();
             let index = current_index.get();
 
             let new_index = match keyval {
                 gdk::Key::Escape => {
+                    // Quit the entire app
                     app.quit();
                     return Propagation::Stop;
                 }
                 gdk::Key::Return => {
+                    // Activate (click) the current button
                     if let Some(button) = buttons.get(index) {
                         button.emit_clicked();
                     }
                     return Propagation::Stop;
                 }
+                // Arrow keys / numeric keypad arrows
                 gdk::Key::Up | gdk::Key::KP_Up => index.saturating_sub(columns),
                 gdk::Key::Down | gdk::Key::KP_Down => {
-                    (index + columns).min(count.saturating_sub(1))
+                    (index + columns).min(total_buttons.saturating_sub(1))
                 }
                 gdk::Key::Left | gdk::Key::KP_Left => index.saturating_sub(1),
-                gdk::Key::Right | gdk::Key::KP_Right => (index + 1).min(count.saturating_sub(1)),
+                gdk::Key::Right | gdk::Key::KP_Right => {
+                    (index + 1).min(total_buttons.saturating_sub(1))
+                }
+                // Tab and Shift+Tab
                 gdk::Key::Tab => {
                     let shift_pressed = state.contains(gdk::ModifierType::SHIFT_MASK);
                     if shift_pressed {
+                        // Move backward
                         if index == 0 {
-                            count.saturating_sub(1)
+                            total_buttons.saturating_sub(1)
                         } else {
                             index.saturating_sub(1)
                         }
                     } else {
-                        (index + 1) % count
+                        // Move forward
+                        (index + 1) % total_buttons
                     }
                 }
+                // Some systems use ISO_Left_Tab for Shift+Tab
                 gdk::Key::ISO_Left_Tab => {
                     if index == 0 {
-                        count.saturating_sub(1)
+                        total_buttons.saturating_sub(1)
                     } else {
                         index.saturating_sub(1)
                     }
                 }
+                // If it doesn't match any recognized key, let GTK handle it
                 _ => return Propagation::Proceed,
             };
 
+            // If we have a new index, focus the corresponding button
             if new_index != index {
                 current_index.set(new_index);
                 if let Some(button) = buttons.get(new_index) {
@@ -293,9 +320,11 @@ fn setup_key_handlers(
                 }
             }
 
+            // Stop propagation since we handled it
             Propagation::Stop
         }
     });
 
+    // Add the controller to the window
     window.add_controller(controller);
 }
