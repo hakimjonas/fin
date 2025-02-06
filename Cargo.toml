@@ -13,6 +13,7 @@ toml = "0.8"
 clap = { version = "4.0", features = ["derive"] }
 log = "0.4.25"
 env_logger = "0.11.6"
+regex = "1.11.1"
 
 [profile.release]
 opt-level = 3

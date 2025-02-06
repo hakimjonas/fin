@@ -29,6 +29,11 @@ use std::path::Path;
 use std::process::Command as ProcessCommand;
 use std::rc::Rc;
 
+/// Default number of columns to use if none is specified.
+fn default_columns() -> usize {
+    1
+}
+
 /// Deserialize a sequence into an `im::Vector<T>`.
 fn deserialize_vector<'de, D, T>(deserializer: D) -> std::result::Result<Vector<T>, D::Error>
 where
@@ -45,6 +50,7 @@ struct Config {
     /// The title of the logout manager window.
     title: String,
     /// The number of columns in the UI grid.
+    #[serde(default = "default_columns")]
     columns: usize,
     /// A list of button configurations.
     #[serde(default, deserialize_with = "deserialize_vector")]
@@ -123,6 +129,7 @@ fn calculate_layout(num_buttons: usize) -> std::result::Result<Vector<Vector<usi
 
 /// Calculates the new index for arrow-key navigation.
 fn new_index_for_arrow(current: usize, total: usize, columns: usize, key: gdk::Key) -> usize {
+    // Since `columns` is guaranteed to be > 0 (via default_columns), we can safely compute the remainder.
     match key {
         gdk::Key::Up | gdk::Key::KP_Up => {
             if current < columns {
@@ -290,14 +297,12 @@ fn build_ui(
     window.set_transient_for(None::<&ApplicationWindow>);
     window.set_resizable(false);
 
-    // Rely on GTK's automatic accessible role assignment for window.
-    // Set a tooltip as an accessible description if desired.
+    // Set a tooltip to describe the window (for accessibility).
     window.set_tooltip_text(Some("HyprPower logout manager window"));
 
     load_css(stylesheet_path, config.use_system_theme)?;
 
     let grid = create_grid();
-    // Rely on GTK to assign the grid role automatically.
     grid.set_tooltip_text(Some("Button grid"));
 
     // Determine grid layout.
@@ -394,9 +399,9 @@ fn load_css(path: &Path, use_system_theme: bool) -> Result<()> {
 /// Error notifications are logged rather than shown visibly.
 fn create_action_button(app: &Application, label: &str, command: &str) -> Button {
     let button = Button::with_label(label);
-    // Rely on the button's label as its accessible name and set a tooltip for description.
+    // Rely on the button's label as its accessible name.
+    // Set a tooltip to serve as an accessible description.
     button.set_tooltip_text(Some(&format!("Executes command: {}", command)));
-    // GTK will automatically assign the role as Button.
 
     let command_string = command.to_string();
     let app_clone = app.clone();

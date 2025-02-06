@@ -1,0 +1,69 @@
+# HyprPower Default Configuration
+title = "HyprPower"
+columns = 2
+stylesheet = "style.css"
+use_system_theme = false
+
+[default_commands]
+# GNOME
+gnome = [
+    { label = "󰌾", command = "xdg-screensaver lock" },
+    { label = "󰍃", command = "gnome-session-quit --logout" },
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
+]
+
+# Hyprland
+hyprland = [
+    { label = "󰌾", command = "hyprctl dispatch exec hyprlock" },
+    { label = "󰍃", command = "loginctl terminate-user $USER" },
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
+]
+
+# Budgie
+budgie = [
+    { label = "󰌾", command = "xdg-screensaver lock" },
+    { label = "󰍃", command = "budgie-session-quit --logout" },
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
+]
+
+# XFCE
+xfce = [
+    { label = "󰌾", command = "xflock4" },
+    { label = "󰍃", command = "xfce4-session-logout --logout" },
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
+]
+
+# i3 Window Manager
+i3 = [
+    { label = "󰌾", command = "i3lock" },
+    { label = "󰍃", command = "i3-msg exit" },
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
+]
+
+# Sway (Wayland i3 Equivalent)
+sway = [
+    { label = "󰌾", command = "swaylock" },
+    { label = "󰍃", command = "swaymsg exit" },
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
+]
+
+# COSMIC DE (Pop!_OS)
+cosmic = [
+    { label = "󰌾", command = "system76-power suspend" },
+    { label = "󰍃", command = "system76-power shutdown" },
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
+]
+
+# Default (Fallback for unknown DEs)
+default = [
+    { label = "󰌾", command = "xdg-screensaver lock" },
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
+]
