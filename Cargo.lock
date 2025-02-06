@@ -546,7 +546,6 @@ dependencies = [
  "gtk4",
  "im",
  "log",
- "regex",
  "serde",
  "toml",
 ]

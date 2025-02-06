@@ -1,0 +1,49 @@
+[env]
+export = ["CARGO_MANIFEST_DIR", "PROJECT_ROOT", "ASSETS_DIR"]
+PROJECT_ROOT = "${CARGO_MAKE_WORKING_DIRECTORY}"
+ASSETS_DIR = "${PROJECT_ROOT}/assets"
+INSTALL_ASSETS_DIR = "/usr/share/hyprpower"
+INSTALL_BIN_DIR = "/usr/local/bin"
+
+[tasks.build-release]
+description = "Build the HyprPower binary in release mode"
+command = "cargo"
+args = ["build", "--release"]
+
+[tasks.copy-assets]
+description = "Copy configuration and style assets to the installation directory"
+script = [
+    "echo 'Creating installation directory ${INSTALL_ASSETS_DIR}'",
+    "sudo mkdir -p ${INSTALL_ASSETS_DIR}",
+    "sudo chmod 755 ${INSTALL_ASSETS_DIR}",
+    "echo 'Resolved ASSETS_DIR: ${ASSETS_DIR}'",
+    "echo 'Resolved INSTALL_ASSETS_DIR: ${INSTALL_ASSETS_DIR}'",
+    "echo 'Resolved CARGO_MANIFEST_DIR: ${CARGO_MANIFEST_DIR}'",
+    "echo 'Installing default configuration...'",
+    "sudo cp \"${ASSETS_DIR}/config.toml\" \"${INSTALL_ASSETS_DIR}/config.toml\"",
+    "echo 'Installing default stylesheet...'",
+    "sudo cp \"${ASSETS_DIR}/style.css\" \"${INSTALL_ASSETS_DIR}/style.css\""
+]
+
+[tasks.install-bin]
+description = "Install the binary to the system binary directory"
+script = [
+    "BINARY=${PROJECT_ROOT}/target/release/hyprpower",
+    "if [ ! -f \"${BINARY}\" ]; then",
+    "  echo 'Error: Binary not found at' ${BINARY} >&2",
+    "  exit 1",
+    "fi",
+    "echo 'Installing binary to ${INSTALL_BIN_DIR}...'",
+    "sudo cp ${BINARY} ${INSTALL_BIN_DIR}/",
+    "sudo chmod 755 ${INSTALL_BIN_DIR}/hyprpower"
+]
+
+[tasks.install]
+description = "Build and install HyprPower (binary and assets)"
+dependencies = ["build-release", "copy-assets", "install-bin"]
+
+[tasks.package]
+description = "Package the application (placeholder task)"
+script = [
+    "echo 'Packaging is not fully implemented yet.'"
+]
