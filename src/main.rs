@@ -1,4 +1,6 @@
 use anyhow::{anyhow, Context, Result};
+use clap::parser::ValueSource;
+use clap::{Arg, Command};
 use glib::Propagation;
 use gtk4::gdk::Display;
 use gtk4::prelude::*;
@@ -6,16 +8,16 @@ use gtk4::{
     gdk, Application, ApplicationWindow, Button, CssProvider, EventControllerFocus,
     EventControllerKey, Grid, STYLE_PROVIDER_PRIORITY_APPLICATION,
 };
-use im::HashMap;
 use im::Vector;
+use im::HashMap;
 use serde::Deserialize;
 use std::cell::Cell;
 use std::env;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
+use std::process::Command as ProcessCommand;
 
-fn deserialize_vector<'de, D, T>(deserializer: D) -> std::result::Result<Vector<T>, D::Error>
+fn deservvialize_vector<'de, D, T>(deserializer: D) -> std::result::Result<Vector<T>, D::Error>
 where
     D: serde::Deserializer<'de>,
     T: serde::Deserialize<'de> + Clone,
@@ -27,7 +29,6 @@ where
 #[derive(Deserialize, Debug, Clone)]
 struct Config {
     title: String,
-    // This value now controls the number of columns used in the UI.
     columns: usize,
     #[serde(default, deserialize_with = "deserialize_vector")]
     buttons: Vector<ButtonConfig>,
@@ -55,7 +56,6 @@ fn get_commands_for_de(de: &str, config: &Config) -> Vector<ButtonConfig> {
     {
         return cmds.clone();
     }
-    // Fall back to a "default" key if available
     if let Some(cmds) = config
         .default_commands
         .get("default")
@@ -63,13 +63,37 @@ fn get_commands_for_de(de: &str, config: &Config) -> Vector<ButtonConfig> {
     {
         return cmds.clone();
     }
-    // Finally, fall back to the top-level buttons, even if that may be empty.
     config.buttons.clone()
 }
 
 fn main() -> Result<()> {
-    let config_path = Path::new("/usr/share/hyprpower/config.toml");
-    let config = load_config(config_path)?;
+    let matches = Command::new("hyprpower")
+        .version("0.1.0")
+        .about("HyprPower Application")
+        .arg(
+            Arg::new("config")
+                .short('c')
+                .long("config")
+                .value_name("FILE")
+                .help("Sets a custom config file")
+                .num_args(1),
+        )
+        .get_matches();
+
+    if matches.contains_id("config") {
+        if matches.value_source("config").expect("checked contains_id") == ValueSource::CommandLine
+        {
+            println!("`config` set by user");
+        } else {
+            println!("`config` is defaulted");
+        }
+    }
+
+    let config_path = matches
+        .get_one::<String>("config")
+        .map(|s| s.as_str())
+        .unwrap_or("/usr/share/hyprpower/config.toml");
+    let config = load_config(Path::new(config_path))?;
     let de = detect_desktop_environment();
     let commands = get_commands_for_de(&de, &config);
     let stylesheet_path = Path::new("/usr/share/hyprpower/style.css");
@@ -130,6 +154,7 @@ fn build_ui(
             "No buttons to display; please check your configuration"
         ));
     }
+
     let window = ApplicationWindow::builder()
         .application(app)
         .title(&config.title)
@@ -139,12 +164,11 @@ fn build_ui(
     window.set_decorated(false);
     window.set_transient_for(None::<&ApplicationWindow>);
     window.set_resizable(false);
+
     load_css(stylesheet_path, config.use_system_theme)?;
 
-    // Create a grid without computing columns automatically.
     let grid = create_grid();
-    // Use the configured number of columns when attaching buttons.
-    attach_buttons_to_grid(&grid, buttons, config.columns, app);
+    attach_buttons_to_grid(&grid, buttons, config.columns, app)?;
 
     window.set_child(Some(&grid));
     setup_focus_controller(&window, app);
@@ -152,9 +176,6 @@ fn build_ui(
     window.present();
     Ok(())
 }
-
-/// Create a grid with the desired spacing and margins.
-/// (No automatic column calculation here.)
 fn create_grid() -> Grid {
     Grid::builder()
         .column_homogeneous(true)
@@ -173,17 +194,53 @@ fn attach_buttons_to_grid(
     buttons: &Vector<ButtonConfig>,
     columns: usize,
     app: &Application,
-) {
-    for (index, button_config) in buttons.iter().enumerate() {
-        let button = create_action_button(app, &button_config.label, &button_config.command);
-        // Use the provided number of columns from the configuration.
-        let col = (index % columns) as i32;
-        let row = (index / columns) as i32;
-        println!(
-            "Attaching button '{}' at row {}, col {}",
-            button_config.label, row, col
-        );
-        grid.attach(&button, col, row, 1, 1);
+) -> Result<()> {
+    if columns == 0 {
+        return Err(anyhow!(
+            "Invalid configuration: columns must be greater than 0"
+        ));
+    }
+
+    let rows = (buttons.len() + columns - 1) / columns;
+    let layout: Vector<Vector<usize>> = (0..rows)
+        .map(|row| {
+            (0..columns)
+                .filter_map(|col| {
+                    let index = row * columns + col;
+                    if index < buttons.len() {
+                        Some(index)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        })
+        .collect();
+
+    let button_widgets: Vector<Button> = layout
+        .iter()
+        .enumerate()
+        .flat_map(|(row, cols)| {
+            cols.iter().enumerate().map(move |(col, &index)| {
+                let button_config = &buttons[index];
+                let button =
+                    create_action_button(app, &button_config.label, &button_config.command);
+                println!(
+                    "Attaching button '{}' at row {}, col {}",
+                    button_config.label, row, col
+                );
+                grid.attach(&button, col as i32, row as i32, 1, 1);
+                button
+            })
+        })
+        .collect();
+
+    setup_focus_chain(grid, &button_widgets);
+    Ok(())
+}
+fn setup_focus_chain(grid: &Grid, buttons: &Vector<Button>) {
+    if let Some(first_button) = buttons.get(0) {
+        grid.set_focus_child(Some(first_button));
     }
 }
 
@@ -228,7 +285,11 @@ fn create_action_button(app: &Application, label: &str, command: &str) -> Button
     let app = app.clone();
     button.connect_clicked(move |_| {
         if !command_string.is_empty() {
-            if let Err(e) = Command::new("sh").arg("-c").arg(&command_string).spawn() {
+            if let Err(e) = ProcessCommand::new("sh")
+                .arg("-c")
+                .arg(&command_string)
+                .spawn()
+            {
                 eprintln!("Failed to execute command '{}': {}", command_string, e);
             }
         }
@@ -316,6 +377,18 @@ fn handle_key_press(
     Propagation::Stop
 }
 
+fn handle_tab_key(index: usize, total_buttons: usize, state: gdk::ModifierType) -> usize {
+    if state.contains(gdk::ModifierType::SHIFT_MASK) {
+        if index == 0 {
+            total_buttons.saturating_sub(1)
+        } else {
+            index.saturating_sub(1)
+        }
+    } else {
+        (index + 1) % total_buttons
+    }
+}
+
 fn calculate_new_index<F>(index: usize, columns: usize, f: F) -> usize
 where
     F: Fn(usize, usize) -> usize,
@@ -324,21 +397,5 @@ where
         f(index, columns)
     } else {
         index
-    }
-}
-
-fn handle_tab_key(index: usize, total_buttons: usize, state: gdk::ModifierType) -> usize {
-    let shift_pressed = state.contains(gdk::ModifierType::SHIFT_MASK);
-    if shift_pressed {
-        if index == 0 {
-            total_buttons.saturating_sub(1)
-        } else {
-            index.saturating_sub(1)
-        }
-    } else if total_buttons > 0 {
-        (index + 1) % total_buttons
-    } else {
-        eprintln!("Warning: No buttons available, avoiding modulo operation.");
-        0
     }
 }
