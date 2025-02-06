@@ -6,12 +6,13 @@ use gtk4::{
     gdk, Application, ApplicationWindow, Button, CssProvider, EventControllerFocus,
     EventControllerKey, Grid, STYLE_PROVIDER_PRIORITY_APPLICATION,
 };
+use im::HashMap;
 use im::Vector;
 use serde::Deserialize;
 use std::cell::Cell;
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 fn deserialize_vector<'de, D, T>(deserializer: D) -> std::result::Result<Vector<T>, D::Error>
@@ -23,14 +24,18 @@ where
     Ok(vec.into_iter().collect())
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct Config {
     title: String,
+    // This value now controls the number of columns used in the UI.
     columns: usize,
-    #[serde(deserialize_with = "deserialize_vector")]
+    #[serde(default, deserialize_with = "deserialize_vector")]
     buttons: Vector<ButtonConfig>,
-    stylesheet: String,
-    use_system_theme: bool, // New field to switch between custom and system theme
+    use_system_theme: bool,
+    #[serde(default)]
+    de_overrides: HashMap<String, Vector<ButtonConfig>>,
+    #[serde(default)]
+    default_commands: HashMap<String, Vector<ButtonConfig>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -39,80 +44,92 @@ struct ButtonConfig {
     command: String,
 }
 
-fn main() {
-    std::process::exit(match run() {
-        Ok(()) => 0,
-        Err(e) => {
-            eprintln!("Error: {:?}", e);
-            1
-        }
-    });
+fn get_commands_for_de(de: &str, config: &Config) -> Vector<ButtonConfig> {
+    if let Some(cmds) = config.de_overrides.get(de).filter(|cmds| !cmds.is_empty()) {
+        return cmds.clone();
+    }
+    if let Some(cmds) = config
+        .default_commands
+        .get(de)
+        .filter(|cmds| !cmds.is_empty())
+    {
+        return cmds.clone();
+    }
+    // Fall back to a "default" key if available
+    if let Some(cmds) = config
+        .default_commands
+        .get("default")
+        .filter(|cmds| !cmds.is_empty())
+    {
+        return cmds.clone();
+    }
+    // Finally, fall back to the top-level buttons, even if that may be empty.
+    config.buttons.clone()
 }
 
-fn run() -> Result<()> {
-    let args: Vector<String> = env::args().collect();
-    let config_path = if args.len() > 1 {
-        PathBuf::from(&args[1])
-    } else if let Ok(env_path) = env::var("LAUNCHER_CONFIG_PATH") {
-        PathBuf::from(env_path)
-    } else {
-        find_config_path()
-    };
-    let config = load_config(&config_path)
-        .with_context(|| format!("Failed to load configuration from {:?}", config_path))?;
-    let stylesheet_path = resolve_stylesheet_path(&config_path, &config.stylesheet);
+fn main() -> Result<()> {
+    let config_path = Path::new("/usr/share/hyprpower/config.toml");
+    let config = load_config(config_path)?;
+    let de = detect_desktop_environment();
+    let commands = get_commands_for_de(&de, &config);
+    let stylesheet_path = Path::new("/usr/share/hyprpower/style.css");
+
     let app = Application::builder()
         .application_id("com.hyprpower.launcher")
         .build();
+
     app.connect_activate(move |app| {
-        if let Err(e) = build_ui(app, &config, &stylesheet_path) {
+        if let Err(e) = build_ui(app, &config, stylesheet_path, &commands) {
             eprintln!("Error building UI: {:?}", e);
             std::process::exit(1);
         }
     });
+
     app.run();
     Ok(())
 }
 
-fn find_config_path() -> PathBuf {
-    if let Ok(xdg_config_home) = env::var("XDG_CONFIG_HOME") {
-        let user_config = Path::new(&xdg_config_home)
-            .join("hyprpower")
-            .join("config.toml");
-        if user_config.exists() {
-            return user_config;
-        }
-    } else if let Ok(home) = env::var("HOME") {
-        let user_config = Path::new(&home)
-            .join(".config")
-            .join("hyprpower")
-            .join("config.toml");
-        if user_config.exists() {
-            return user_config;
-        }
-    }
-    Path::new("/usr/share/hyprpower").join("config.toml")
+fn detect_desktop_environment() -> String {
+    env::var("XDG_CURRENT_DESKTOP")
+        .or_else(|_| env::var("DESKTOP_SESSION"))
+        .unwrap_or_default()
+        .to_lowercase()
+        .split(':')
+        .next()
+        .unwrap_or("unknown")
+        .to_string()
 }
 
 fn load_config(path: &Path) -> Result<Config> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Could not read config file {:?}", path))?;
-    toml::from_str(&content).context("TOML deserialization error")
-}
+    let config: Config = fs::read_to_string(path)
+        .with_context(|| format!("Could not read config file {:?}", path))
+        .and_then(|content| toml::from_str(&content).context("TOML deserialization error"))?;
 
-fn resolve_stylesheet_path(config_file_path: &Path, stylesheet: &str) -> PathBuf {
-    let stylesheet_path = Path::new(stylesheet);
-    if stylesheet_path.is_absolute() {
-        stylesheet_path.to_path_buf()
-    } else {
-        config_file_path
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .join(stylesheet_path)
+    if config.columns == 0 {
+        return Err(anyhow!(
+            "Invalid configuration: columns must be greater than 0"
+        ));
     }
+
+    Ok(config)
 }
 
-fn build_ui(app: &Application, config: &Config, stylesheet_path: &Path) -> Result<()> {
+fn build_ui(
+    app: &Application,
+    config: &Config,
+    stylesheet_path: &Path,
+    buttons: &Vector<ButtonConfig>,
+) -> Result<()> {
+    if config.columns == 0 {
+        return Err(anyhow!(
+            "Invalid configuration: columns must be greater than 0"
+        ));
+    }
+    if buttons.is_empty() {
+        return Err(anyhow!(
+            "No buttons to display; please check your configuration"
+        ));
+    }
     let window = ApplicationWindow::builder()
         .application(app)
         .title(&config.title)
@@ -123,7 +140,23 @@ fn build_ui(app: &Application, config: &Config, stylesheet_path: &Path) -> Resul
     window.set_transient_for(None::<&ApplicationWindow>);
     window.set_resizable(false);
     load_css(stylesheet_path, config.use_system_theme)?;
-    let grid = Grid::builder()
+
+    // Create a grid without computing columns automatically.
+    let grid = create_grid();
+    // Use the configured number of columns when attaching buttons.
+    attach_buttons_to_grid(&grid, buttons, config.columns, app);
+
+    window.set_child(Some(&grid));
+    setup_focus_controller(&window, app);
+    setup_key_handlers(&window, app, collect_buttons(&grid), config.columns);
+    window.present();
+    Ok(())
+}
+
+/// Create a grid with the desired spacing and margins.
+/// (No automatic column calculation here.)
+fn create_grid() -> Grid {
+    Grid::builder()
         .column_homogeneous(true)
         .row_homogeneous(true)
         .column_spacing(10)
@@ -132,29 +165,41 @@ fn build_ui(app: &Application, config: &Config, stylesheet_path: &Path) -> Resul
         .margin_bottom(20)
         .margin_start(20)
         .margin_end(20)
-        .build();
-    for (index, button_config) in config.buttons.iter().enumerate() {
+        .build()
+}
+
+fn attach_buttons_to_grid(
+    grid: &Grid,
+    buttons: &Vector<ButtonConfig>,
+    columns: usize,
+    app: &Application,
+) {
+    for (index, button_config) in buttons.iter().enumerate() {
         let button = create_action_button(app, &button_config.label, &button_config.command);
-        let col = (index % config.columns) as i32;
-        let row = (index / config.columns) as i32;
+        // Use the provided number of columns from the configuration.
+        let col = (index % columns) as i32;
+        let row = (index / columns) as i32;
+        println!(
+            "Attaching button '{}' at row {}, col {}",
+            button_config.label, row, col
+        );
         grid.attach(&button, col, row, 1, 1);
     }
-    window.set_child(Some(&grid));
+}
+
+fn setup_focus_controller(window: &ApplicationWindow, app: &Application) {
     let app_clone = app.clone();
     let focus_controller = EventControllerFocus::new();
     focus_controller.connect_leave(move |_| {
         app_clone.quit();
     });
     window.add_controller(focus_controller);
-    let children: Vector<_> =
-        std::iter::successors(grid.first_child(), |child| child.next_sibling()).collect();
-    let buttons: Vector<Button> = children
-        .into_iter()
+}
+
+fn collect_buttons(grid: &Grid) -> Vector<Button> {
+    std::iter::successors(grid.first_child(), |child| child.next_sibling())
         .filter_map(|w| w.downcast::<Button>().ok())
-        .collect();
-    setup_key_handlers(&window, app, buttons, config.columns);
-    window.present();
-    Ok(())
+        .collect()
 }
 
 fn load_css(path: &Path, use_system_theme: bool) -> Result<()> {
@@ -210,56 +255,90 @@ fn setup_key_handlers(
         let buttons = buttons.clone();
         let current_index = current_index.clone();
         move |_, keyval, _hardware_keycode, state| {
-            let total_buttons = buttons.len();
-            let index = current_index.get();
-            let new_index = match keyval {
-                gdk::Key::Escape => {
-                    app.quit();
-                    return Propagation::Stop;
-                }
-                gdk::Key::Return => {
-                    if let Some(button) = buttons.get(index) {
-                        button.emit_clicked();
-                    }
-                    return Propagation::Stop;
-                }
-                gdk::Key::Up | gdk::Key::KP_Up => index.saturating_sub(columns),
-                gdk::Key::Down | gdk::Key::KP_Down => {
-                    (index + columns).min(total_buttons.saturating_sub(1))
-                }
-                gdk::Key::Left | gdk::Key::KP_Left => index.saturating_sub(1),
-                gdk::Key::Right | gdk::Key::KP_Right => {
-                    (index + 1).min(total_buttons.saturating_sub(1))
-                }
-                gdk::Key::Tab => {
-                    let shift_pressed = state.contains(gdk::ModifierType::SHIFT_MASK);
-                    if shift_pressed {
-                        if index == 0 {
-                            total_buttons.saturating_sub(1)
-                        } else {
-                            index.saturating_sub(1)
-                        }
-                    } else {
-                        (index + 1) % total_buttons
-                    }
-                }
-                gdk::Key::ISO_Left_Tab => {
-                    if index == 0 {
-                        total_buttons.saturating_sub(1)
-                    } else {
-                        index.saturating_sub(1)
-                    }
-                }
-                _ => return Propagation::Proceed,
-            };
-            if new_index != index {
-                current_index.set(new_index);
-                if let Some(button) = buttons.get(new_index) {
-                    button.grab_focus();
-                }
-            }
-            Propagation::Stop
+            handle_key_press(
+                app.clone(),
+                buttons.clone(),
+                current_index.clone(),
+                columns,
+                keyval,
+                state,
+            )
         }
     });
     window.add_controller(controller);
+}
+
+fn handle_key_press(
+    app: Application,
+    buttons: Vector<Button>,
+    current_index: std::rc::Rc<Cell<usize>>,
+    columns: usize,
+    keyval: gdk::Key,
+    state: gdk::ModifierType,
+) -> Propagation {
+    let total_buttons = buttons.len();
+    let index = current_index.get();
+    let new_index = match keyval {
+        gdk::Key::Escape => {
+            app.quit();
+            return Propagation::Stop;
+        }
+        gdk::Key::Return => {
+            if let Some(button) = buttons.get(index) {
+                button.emit_clicked();
+            }
+            return Propagation::Stop;
+        }
+        gdk::Key::Up | gdk::Key::KP_Up => {
+            calculate_new_index(index, columns, |i, c| i.saturating_sub(c))
+        }
+        gdk::Key::Down | gdk::Key::KP_Down => calculate_new_index(index, columns, |i, c| {
+            (i + c).min(total_buttons.saturating_sub(1))
+        }),
+        gdk::Key::Left | gdk::Key::KP_Left => index.saturating_sub(1),
+        gdk::Key::Right | gdk::Key::KP_Right => (index + 1).min(total_buttons.saturating_sub(1)),
+        gdk::Key::Tab => handle_tab_key(index, total_buttons, state),
+        gdk::Key::ISO_Left_Tab => {
+            if index == 0 {
+                total_buttons.saturating_sub(1)
+            } else {
+                index.saturating_sub(1)
+            }
+        }
+        _ => return Propagation::Proceed,
+    };
+    if new_index != index {
+        current_index.set(new_index);
+        if let Some(button) = buttons.get(new_index) {
+            button.grab_focus();
+        }
+    }
+    Propagation::Stop
+}
+
+fn calculate_new_index<F>(index: usize, columns: usize, f: F) -> usize
+where
+    F: Fn(usize, usize) -> usize,
+{
+    if columns > 0 {
+        f(index, columns)
+    } else {
+        index
+    }
+}
+
+fn handle_tab_key(index: usize, total_buttons: usize, state: gdk::ModifierType) -> usize {
+    let shift_pressed = state.contains(gdk::ModifierType::SHIFT_MASK);
+    if shift_pressed {
+        if index == 0 {
+            total_buttons.saturating_sub(1)
+        } else {
+            index.saturating_sub(1)
+        }
+    } else if total_buttons > 0 {
+        (index + 1) % total_buttons
+    } else {
+        eprintln!("Warning: No buttons available, avoiding modulo operation.");
+        0
+    }
 }
