@@ -2,11 +2,11 @@
 export = ["CARGO_MANIFEST_DIR", "PROJECT_ROOT", "ASSETS_DIR"]
 PROJECT_ROOT = "${CARGO_MAKE_WORKING_DIRECTORY}"
 ASSETS_DIR = "${PROJECT_ROOT}/assets"
-INSTALL_ASSETS_DIR = "/usr/share/hyprpower"
+INSTALL_ASSETS_DIR = "/usr/share/fin"
 INSTALL_BIN_DIR = "/usr/local/bin"
 
 [tasks.build-release]
-description = "Build the HyprPower binary in release mode"
+description = "Build the Finë binary in release mode"
 command = "cargo"
 args = ["build", "--release"]
 
@@ -28,18 +28,18 @@ script = [
 [tasks.install-bin]
 description = "Install the binary to the system binary directory"
 script = [
-    "BINARY=${PROJECT_ROOT}/target/release/hyprpower",
+    "BINARY=${PROJECT_ROOT}/target/release/fin",
     "if [ ! -f \"${BINARY}\" ]; then",
     "  echo 'Error: Binary not found at' ${BINARY} >&2",
     "  exit 1",
     "fi",
     "echo 'Installing binary to ${INSTALL_BIN_DIR}...'",
     "sudo cp ${BINARY} ${INSTALL_BIN_DIR}/",
-    "sudo chmod 755 ${INSTALL_BIN_DIR}/hyprpower"
+    "sudo chmod 755 ${INSTALL_BIN_DIR}/fin"
 ]
 
 [tasks.install]
-description = "Build and install HyprPower (binary and assets)"
+description = "Build and install Finë (binary and assets)"
 dependencies = ["build-release", "copy-assets", "install-bin"]
 
 [tasks.package]

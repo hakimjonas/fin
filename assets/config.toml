@@ -1,5 +1,5 @@
-# HyprPower Default Configuration
-title = "HyprPower"
+# Finë Default Configuration
+title = "Finë"
 columns = 2
 stylesheet = "style.css"
 use_system_theme = false

@@ -1,6 +1,6 @@
-//! # HyprPower Logout Manager
+//! # Finë Logout Manager
 //!
-//! A GTK4-based logout manager for HyprPower. This application reads its configuration
+//! A GTK4-based logout manager for Finë. This application reads its configuration
 //! from a TOML file, creates a grid-based UI with buttons for various commands, and supports
 //! cyclic keyboard navigation. The design emphasizes functional programming principles,
 //! using immutable data structures and pure functions where possible.
@@ -44,7 +44,7 @@ where
     Ok(vec.into_iter().collect())
 }
 
-/// Configuration for HyprPower loaded from a TOML file.
+/// Configuration for Finë loaded from a TOML file.
 #[derive(Deserialize, Debug, Clone)]
 struct Config {
     /// The title of the logout manager window.
@@ -196,9 +196,9 @@ fn create_buttons(app: &Application, btn_configs: &Vector<ButtonConfig>) -> Vect
 fn main() -> Result<()> {
     env_logger::init();
 
-    let matches = Command::new("hyprpower")
+    let matches = Command::new("fin")
         .version("0.1.0")
-        .about("HyprPower Application")
+        .about("Finë Application")
         .arg(
             Arg::new("config")
                 .short('c')
@@ -221,14 +221,14 @@ fn main() -> Result<()> {
     let config_path = matches
         .get_one::<String>("config")
         .map(|s| s.as_str())
-        .unwrap_or("/usr/share/hyprpower/config.toml");
+        .unwrap_or("/usr/share/fin/config.toml");
     let config = load_config(Path::new(config_path))?;
     let de = detect_desktop_environment();
     let commands = get_commands_for_de(&de, &config);
-    let stylesheet_path = Path::new("/usr/share/hyprpower/style.css");
+    let stylesheet_path = Path::new("/usr/share/fin/style.css");
 
     let app = Application::builder()
-        .application_id("com.hyprpower.launcher")
+        .application_id("com.fin.launcher")
         .build();
 
     app.connect_activate(move |app| {
@@ -298,7 +298,7 @@ fn build_ui(
     window.set_resizable(false);
 
     // Set a tooltip to describe the window (for accessibility).
-    window.set_tooltip_text(Some("HyprPower logout manager window"));
+    window.set_tooltip_text(Some("Finë logout manager window"));
 
     load_css(stylesheet_path, config.use_system_theme)?;
 
