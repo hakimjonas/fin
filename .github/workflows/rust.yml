@@ -1,37 +1,27 @@
-name: CI
+# Use the official Solus image (development tag) from Docker Hub.
+FROM silkeh/solus:devel
 
-on:
-  push:
-    branches: [ trunk ]
-  pull_request:
-    branches: [ trunk ]
+# Update the package repository and install GTK4 development libraries.
+RUN eopkg up && eopkg it libgtk-4-devel --yes-all
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    container:
-      image: hakimjonas/fin-gtk:latest
+# Install the Rust toolchain using rustup, update stable toolchain, and set default to stable.
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
+    . $HOME/.cargo/env && rustup update stable && rustup default stable
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+# Ensure Cargo’s bin directory is in the PATH.
+ENV PATH="/root/.cargo/bin:${PATH}"
 
-      - name: Cache Cargo registry and git index
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+# Set working directory.
+WORKDIR /app
 
-      - name: Cache Cargo build artifacts
-        uses: actions/cache@v3
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+# Copy the source code into the container.
+COPY . .
 
-      - name: Build project in release mode
-        run: cargo build --release
+# Update dependencies before building the app.
+RUN cargo update
 
-      - name: Run tests
-        run: cargo test
+# Build the project in release mode.
+RUN cargo build --release
+
+# Run the application.
+CMD ["./target/release/fin"]
