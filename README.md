@@ -112,7 +112,7 @@ Finë is designed to be simple and effective—but we know there’s always room
 collaboration, I welcome ideas and contributions. Here are some potential areas where your
 contributions could make a difference:
 
-- Improoved and less idiosyncratic layout :-)  
+- Improved and less idiosyncratic layout :-)  
 
 - Extensible Plugin System:
   Imagine adding the ability for users to extend Finë with custom command sets or actions. If you have ideas for a
