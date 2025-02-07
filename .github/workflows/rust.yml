@@ -1,40 +1,40 @@
 name: CI
 
-  on:
-    push:
-      branches: [ trunk ]
-    pull_request:
-      branches: [ trunk ]
+              on:
+                push:
+                  branches: [ trunk ]
+                pull_request:
+                  branches: [ trunk ]
 
-  jobs:
-    build:
-      runs-on: ubuntu-latest
-      container:
-        image: hakimjonas/fin-gtk:latest
+              jobs:
+                build:
+                  runs-on: ubuntu-latest
+                  container:
+                    image: hakimjonas/fin-gtk:latest
 
-      steps:
-        - name: Checkout repository
-          uses: actions/checkout@v3
+                  steps:
+                    - name: Checkout repository
+                      uses: actions/checkout@v3
 
-        - name: Cache Cargo registry and git index
-          uses: actions/cache@v3
-          with:
-            path: |
-              ~/.cargo/registry
-              ~/.cargo/git
-            key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+                    - name: Cache Cargo registry and git index
+                      uses: actions/cache@v3
+                      with:
+                        path: |
+                          ~/.cargo/registry
+                          ~/.cargo/git
+                        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
-        - name: Cache Cargo build artifacts
-          uses: actions/cache@v3
-          with:
-            path: target
-            key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+                    - name: Cache Cargo build artifacts
+                      uses: actions/cache@v3
+                      with:
+                        path: target
+                        key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
 
-        - name: Set default Rust toolchain to stable
-          run: rustup default stable
+                    - name: Set default Rust toolchain to stable
+                      run: rustup default stable
 
-        - name: Build project in release mode
-          run: cargo build --release
+                    - name: Build project in release mode
+                      run: cargo build --release
 
-        - name: Run tests
-          run: cargo test
+                    - name: Run tests
+                      run: cargo test
