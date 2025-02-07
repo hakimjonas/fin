@@ -17,7 +17,7 @@ jobs:
       - name: Install system dependencies for GTK4
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libgdk-3-dev
+          sudo apt-get install -y libgtk-4-dev
 
       - name: Set up Rust toolchain
         uses: actions-rs/toolchain@v1
