@@ -9,25 +9,17 @@
 //! to convey descriptive information for assistive technologies.
 
 use anyhow::{anyhow, Context, Result};
-use clap::parser::ValueSource;
-use clap::{Arg, Command};
+use clap::{parser::ValueSource, Arg, Command};
 use glib::Propagation;
 use gtk4::gdk::Display;
-use gtk4::prelude::*;
 use gtk4::{
-    gdk, Application, ApplicationWindow, Button, CssProvider, EventControllerFocus,
+    gdk, prelude::*, Application, ApplicationWindow, Button, CssProvider, EventControllerFocus,
     EventControllerKey, Grid, STYLE_PROVIDER_PRIORITY_APPLICATION,
 };
-use im::Vector;
-use im::{vector, HashMap};
+use im::{vector, HashMap, Vector};
 use log::{error, info};
 use serde::Deserialize;
-use std::cell::Cell;
-use std::env;
-use std::fs;
-use std::path::Path;
-use std::process::Command as ProcessCommand;
-use std::rc::Rc;
+use std::{cell::Cell, env, fs, path::Path, process::Command as ProcessCommand, rc::Rc};
 
 /// Default number of columns to use if none is specified.
 fn default_columns() -> usize {
@@ -477,4 +469,116 @@ fn setup_key_handlers(
         });
     }
     window.add_controller(controller);
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use im::hashmap;
+    use std::path::PathBuf;
+
+    #[test]
+    fn load_config_valid_file() {
+        let path = PathBuf::from("assets/config.toml");
+        let config = load_config(&path).expect("Failed to load valid config");
+        assert_eq!(config.title, "Finë");
+        assert_eq!(config.columns, 2);
+        assert_eq!(config.buttons.len(), 0); // No buttons defined in the default config
+    }
+    #[test]
+    fn load_config_invalid_file() {
+        let path = PathBuf::from("tests/fixtures/invalid_config.toml");
+        let result = load_config(&path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn load_config_nonexistent_file() {
+        let path = PathBuf::from("tests/fixtures/nonexistent_config.toml");
+        let result = load_config(&path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn calculate_layout_valid_buttons() {
+        let layout = calculate_layout(4).expect("Failed to calculate layout");
+        assert_eq!(layout.len(), 2);
+        assert_eq!(layout[0].len(), 2);
+        assert_eq!(layout[1].len(), 2);
+    }
+
+    #[test]
+    fn calculate_layout_invalid_buttons() {
+        let result = calculate_layout(7);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn new_index_for_arrow_up() {
+        let index = new_index_for_arrow(3, 6, 2, gdk::Key::Up);
+        assert_eq!(index, 1);
+    }
+
+    #[test]
+    fn new_index_for_arrow_down() {
+        let index = new_index_for_arrow(1, 6, 2, gdk::Key::Down);
+        assert_eq!(index, 3);
+    }
+
+    #[test]
+    fn new_index_for_arrow_left() {
+        let index = new_index_for_arrow(1, 6, 2, gdk::Key::Left);
+        assert_eq!(index, 0);
+    }
+
+    #[test]
+    fn new_index_for_arrow_right() {
+        let index = new_index_for_arrow(0, 6, 2, gdk::Key::Right);
+        assert_eq!(index, 1);
+    }
+
+    #[test]
+    fn calculate_new_index_for_tab_forward() {
+        let index = calculate_new_index_for_tab(2, 4, true);
+        assert_eq!(index, 3);
+    }
+
+    #[test]
+    fn calculate_new_index_for_tab_backward() {
+        let index = calculate_new_index_for_tab(0, 4, false);
+        assert_eq!(index, 3);
+    }
+
+    #[test]
+    fn get_commands_for_de_with_override() {
+        let config = Config {
+            title: "Test".to_string(),
+            columns: 1,
+            buttons: vector![],
+            use_system_theme: false,
+            de_overrides: hashmap! {
+                "test_de".to_string() => vector![ButtonConfig { label: "Override".to_string(), command: "echo override".to_string() }]
+            },
+            default_commands: hashmap! {},
+        };
+        let commands = get_commands_for_de("test_de", &config);
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0].label, "Override");
+    }
+
+    #[test]
+    fn get_commands_for_de_with_default() {
+        let config = Config {
+            title: "Test".to_string(),
+            columns: 1,
+            buttons: vector![],
+            use_system_theme: false,
+            de_overrides: hashmap! {},
+            default_commands: hashmap! {
+                "default".to_string() => vector![ButtonConfig { label: "Default".to_string(), command: "echo default".to_string() }]
+            },
+        };
+        let commands = get_commands_for_de("unknown_de", &config);
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0].label, "Default");
+    }
 }
