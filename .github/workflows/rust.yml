@@ -9,15 +9,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/your-org/gtk4-rust:latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
-      - name: Install system dependencies for GTK4
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev
 
       - name: Set up Rust toolchain
         uses: actions-rs/toolchain@v1
