@@ -1,6 +1,6 @@
-# Finë Logout Manager
+# Finë
 
-Finë is a simple, GTK4-based logout manager designed for Linux desktops. The aim is simple: to offer an unassuming
+Finë is a simple, GTK4-based session controller designed for Linux desktops. The aim is simple: to offer an unassuming
 yet effective means of managing session transitions like logging out, locking, rebooting, or shutting down—while
 embracing clarity and thoughtful design. It started as a personal project for my own use in HyprLand, but it should work
 most Linux desktop environments, given the required dependencies. I know my choice of immutable data structures are
