@@ -10,17 +10,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/your-org/gtk4-rust:latest
+      image: hakimjonas/fin-gtk:latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
-      - name: Set up Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
 
       - name: Cache Cargo registry and git index
         uses: actions/cache@v3
