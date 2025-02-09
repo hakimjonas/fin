@@ -68,15 +68,19 @@ jobs:
         run: cargo test
 
   build-solus:
-    runs-on: solus-latest
+    runs-on: ubuntu-latest
+    container:
+      image: silkeh/solus:devel
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          . $HOME/.cargo/env
+          rustup update stable
+          rustup default stable
 
       - name: Install dependencies
         run: sudo eopkg up && sudo eopkg it -y libgtk-4-devel
