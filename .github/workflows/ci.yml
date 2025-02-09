@@ -2,9 +2,9 @@ name: CI - Multi-Distro Build & Test
 
 on:
   push:
-    branches: [ automations ]
+    branches: [ automations, trunk ] 
   pull_request:
-    branches: [ automations ]
+    branches: [ automations, trunk ]
   workflow_dispatch:
 
 jobs:
@@ -16,13 +16,13 @@ jobs:
         distro: [ ubuntu, fedora, arch, solus, nix ]
     runs-on: ubuntu-latest
     container:
-      image: ${{
+      image: ${{ 
         matrix.distro == 'ubuntu' && 'ubuntu:latest' ||
         matrix.distro == 'fedora' && 'fedora:latest' ||
         matrix.distro == 'arch' && 'archlinux:latest' ||
         matrix.distro == 'solus' && 'silkeh/solus:devel' ||
         matrix.distro == 'nix' && 'nixos/nix'
-    }}
+      }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -53,11 +53,11 @@ jobs:
               ;;
             solus)
               sudo eopkg upgrade
-              sudo eopkg it -y libgtk-4-devel
+              sudo eopkg install -y libgtk-4-devel
               ;;
             nix)
               # The nixos/nix container typically has a basic set of tools installed.
-              # Install additional dependencies if needed (for example, via 'nix-env').
+              # Install additional dependencies if needed.
               nix-env -iA nixpkgs.libgtk4 2>/dev/null || echo "Assuming gtk4 is available"
               ;;
             *)
