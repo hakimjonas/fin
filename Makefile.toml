@@ -124,7 +124,7 @@ dependencies = ["build-release"]
 script = [
     # Install cargo-rpm from crates.io instead of GitHub
     "echo 'Installing cargo-rpm...'",
-    "cargo install cargo-rpm --version 0.5.0 || true", # Use latest version from crates.io
+    "cargo install cargo-rpm --version 0.8.0 || true", # Use latest version from crates.io
 
     # Initialize RPM config if needed
     "if [ ! -f rpm-config.json ]; then cargo rpm init; fi",
