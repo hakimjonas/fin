@@ -120,13 +120,14 @@ script = [
 
 [tasks.package-rpm]
 description = "Package Finë as an .rpm using cargo-rpm (experimental)"
+dependencies = ["build-release"]
 script = [
     "echo 'Ensuring $HOME/.cargo/bin is in PATH...'",
     "export PATH=\"$HOME/.cargo/bin:$PATH\"",
     "echo 'Installing cargo-rpm from the official cargo registry...'",
     "cargo install cargo-rpm --force",
     "echo 'Packaging .rpm...'",
-    "cargo rpm build --release",
+    "cargo rpm build",
     "echo 'RPM package created'"
 ]
 
