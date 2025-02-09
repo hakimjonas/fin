@@ -118,6 +118,20 @@ script = [
     "cargo deb --no-build"
 ]
 
+[tasks.package-rpm]
+description = "Package Finë as an .rpm using cargo-rpm (experimental)"
+script = [
+    "echo 'Ensuring $HOME/.cargo/bin is in PATH...'",
+    "export PATH=\"$HOME/.cargo/bin:$PATH\"",
+    "echo 'Forcing Cargo to use the Git CLI for fetching...'",
+    "export CARGO_NET_GIT_FETCH_WITH_CLI=true",
+    "echo 'Installing cargo-rpm from GitHub via HTTPS (experimental)...'",
+    "cargo install --git https://github.com/kwiki/cargo-rpm.git --force",
+    "echo 'Packaging .rpm...'",
+    "cargo rpm build --release",
+    "echo 'RPM package created'"
+]
+
 [tasks.package-solus]
 description = "Package Finë for Solus as a tarball (including Solus manifest if available)"
 script = [
@@ -158,5 +172,12 @@ script = [
 ]
 
 [tasks.package]
-description = "Package Finë for distribution (.deb, Solus, Arch, and Nix)"
-dependencies = ["build-release", "package-deb", "package-solus", "package-arch", "package-nix"]
+description = "Package Finë for distribution (.deb, .rpm, Solus, Arch, and Nix)"
+dependencies = [
+    "build-release",
+    "package-deb",
+    "package-rpm",
+    "package-solus",
+    "package-arch",
+    "package-nix"
+]

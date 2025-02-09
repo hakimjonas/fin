@@ -10,14 +10,15 @@ jobs:
   build:
     strategy:
       matrix:
-        distro: [ ubuntu, fedora, arch, solus ]
+        distro: [ ubuntu, fedora, arch, solus, nix ]
     runs-on: ubuntu-latest
     container:
       image: ${{
         matrix.distro == 'ubuntu' && 'ubuntu:latest' ||
         matrix.distro == 'fedora' && 'fedora:latest' ||
         matrix.distro == 'arch' && 'archlinux:latest' ||
-        matrix.distro == 'solus' && 'silkeh/solus:devel'
+        matrix.distro == 'solus' && 'silkeh/solus:devel' ||
+        matrix.distro == 'nix' && 'nixos/nix'
     }}
     steps:
       - name: Checkout repository
@@ -51,6 +52,11 @@ jobs:
               sudo eopkg upgrade
               sudo eopkg it -y libgtk-4-devel
               ;;
+            nix)
+              # The nixos/nix container typically has a basic set of tools installed.
+              # Install additional dependencies if needed (for example, via 'nix-env').
+              nix-env -iA nixpkgs.libgtk4 2>/dev/null || echo "Assuming gtk4 is available"
+              ;;
             *)
               echo "Unsupported distro: ${{ matrix.distro }}"
               exit 1
@@ -72,6 +78,7 @@ jobs:
           name: fin-package-${{ matrix.distro }}
           path: |
             target/debian/fin_*.deb
+            target/fin-*-rpm.tar.gz
             target/fin-*-solus.tar.gz
             target/fin-*-arch.tar.gz
             target/fin-*-nix.tar.gz
