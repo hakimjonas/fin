@@ -131,7 +131,7 @@ script = [
     "if [ ! -f rpm-config.json ]; then cargo rpm init; fi",
     # Build RPM package
     "echo 'Packaging .rpm...'",
-    "cargo rpm build --release",
+    "cargo rpm build",
     "echo 'RPM package created at target/release/rpmbuild/RPMS/'"
 ]
 
