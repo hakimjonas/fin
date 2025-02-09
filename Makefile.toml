@@ -4,7 +4,7 @@ PROJECT_ROOT = "${CARGO_MAKE_WORKING_DIRECTORY}"
 ASSETS_DIR = "${PROJECT_ROOT}/assets"
 INSTALL_ASSETS_DIR = "/usr/share/fin"
 INSTALL_BIN_DIR = "/usr/local/bin"
-# CARGO_MAKE_CRATE_VERSION is automatically provided by cargo-make (if not, you can extract it with a script)
+# Use the built-in variable provided by cargo-make
 VERSION = "${CARGO_MAKE_CRATE_VERSION}"
 
 [tasks.install-cargo-make]
@@ -58,19 +58,19 @@ script = [
 [tasks.install-dependencies-fedora]
 description = "Install dependencies on Fedora"
 script = [
-    "sudo dnf install -y gtk4-devel"
+    "sudo dnf install -y gtk4-devel pkgconf-pkg-config"
 ]
 
 [tasks.install-dependencies-arch]
 description = "Install dependencies on Arch Linux"
 script = [
-    "sudo pacman -S --noconfirm gtk4"
+    "sudo pacman -Syu --noconfirm gtk4 base-devel pkgconf"
 ]
 
 [tasks.install-dependencies-solus]
 description = "Install dependencies on Solus"
 script = [
-    "sudo eopkg up",
+    "sudo eopkg upgrade",
     "sudo eopkg it -y libgtk-4-devel"
 ]
 
@@ -107,7 +107,7 @@ script = [
 description = "Build and install Finë (binary and assets)"
 dependencies = ["install-dependencies", "build-release", "copy-assets", "install-bin"]
 
-# --- Packaging tasks ---
+# --- Packaging Tasks ---
 
 [tasks.package-deb]
 description = "Package Finë as a .deb using cargo-deb"
@@ -119,13 +119,14 @@ script = [
 ]
 
 [tasks.package-solus]
-description = "Package Finë for Solus as a tarball"
+description = "Package Finë for Solus as a tarball (including Solus manifest if available)"
 script = [
     "echo 'Packaging for Solus...'",
     "rm -rf target/package/solus",
     "mkdir -p target/package/solus/usr/local/bin target/package/solus/usr/share/fin",
     "cp target/release/fin target/package/solus/usr/local/bin/",
     "cp -r assets target/package/solus/usr/share/fin/",
+    "if [ -f fin.sol ]; then cp fin.sol target/package/solus/; else echo 'Warning: No Solus manifest (fin.sol) found.'; fi",
     "tar -czvf target/fin-${VERSION}-solus.tar.gz -C target/package/solus .",
     "echo 'Solus package created: target/fin-${VERSION}-solus.tar.gz'"
 ]
@@ -138,7 +139,7 @@ script = [
     "mkdir -p target/package/arch/fin",
     "cp target/release/fin target/package/arch/fin/",
     "cp -r assets target/package/arch/fin/",
-    "if [ -f PKGBUILD ]; then cp PKGBUILD target/package/arch/fin/; else echo 'Warning: No PKGBUILD file found. Please add one for better integration.'; fi",
+    "if [ -f PKGBUILD ]; then cp PKGBUILD target/package/arch/fin/; else echo 'Warning: No PKGBUILD file found.'; fi",
     "tar -czvf target/fin-${VERSION}-arch.tar.gz -C target/package/arch fin",
     "echo 'Arch package created: target/fin-${VERSION}-arch.tar.gz'"
 ]
@@ -151,7 +152,7 @@ script = [
     "mkdir -p target/package/nix/fin",
     "cp target/release/fin target/package/nix/fin/",
     "cp -r assets target/package/nix/fin/",
-    "if [ -f default.nix ]; then cp default.nix target/package/nix/fin/; else echo 'Warning: No default.nix file found. Please add one for better integration.'; fi",
+    "if [ -f default.nix ]; then cp default.nix target/package/nix/fin/; else echo 'Warning: No default.nix file found.'; fi",
     "tar -czvf target/fin-${VERSION}-nix.tar.gz -C target/package/nix fin",
     "echo 'Nix package created: target/fin-${VERSION}-nix.tar.gz'"
 ]
