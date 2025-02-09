@@ -28,15 +28,19 @@ jobs:
         run: cargo test
 
   build-fedora:
-    runs-on: fedora-latest
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          . $HOME/.cargo/env
+          rustup update stable
+          rustup default stable
 
       - name: Install dependencies
         run: sudo dnf install -y gtk4-devel
@@ -48,15 +52,19 @@ jobs:
         run: cargo test
 
   build-arch:
-    runs-on: arch-latest
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          . $HOME/.cargo/env
+          rustup update stable
+          rustup default stable
 
       - name: Install dependencies
         run: sudo pacman -S --noconfirm gtk4
