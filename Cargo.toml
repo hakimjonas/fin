@@ -8,31 +8,44 @@ readme = "README.md"
 authors = ["Hakim Jonas Ghoula"]
 homepage = "https://github.com/hakimjonas/fin"
 repository = "https://github.com/hakimjonas/fin"
-documentation = "https://docs.rs/fin"  # Or your preferred documentation URL
+documentation = "https://docs.rs/fin"
 
 [dependencies]
-gtk4 = { version = "0.9", features = ["v4_4", "v4_12"] }
-glib = "0.20.7"
-anyhow = "1.0"
-im = { version = "15.0", features = ["serde"] }
-serde = { version = "1.0", features = ["derive"] }
-toml = "0.8"
-clap = { version = "4.0", features = ["derive"] }
-log = "0.4.25"
-env_logger = "0.11.6"
+gtk4 = { version = "0.9.3", features = ["v4_12"] }  # Latest stable with GTK 4.12 features
+glib = "0.20.7"                     # Updated to match GTK4 version
+anyhow = "1.0.81"                   # Updated error handling
+im = { version = "15.1.0", features = ["serde"] }  # Latest immutable collections
+serde = { version = "1.0.203", features = ["derive"] }
+toml = "0.8.14"                     # Updated TAML support
+clap = { version = "4.5.4", features = ["derive"] }  # Latest CLI parser
+log = "0.4.21"
+env_logger = "0.11.3"               # Updated logging stack
+
 
 [profile.release]
-opt-level = 3
+opt-level = "z"                     # Optimize for size
 lto = "thin"
 codegen-units = 1
-panic = "unwind"
+panic = "abort"                     # More secure than unwind
 strip = "symbols"
 
 [package.metadata.rpm]
-package = "fin"
+name = "fin"
+version = "0.1.0"
+release = "1%{?dist}"
+summary = "GTK4-based session controller"
+license = "MIT"
+url = "https://github.com/hakimjonas/fin"
+requires = ["gtk4 >= 4.12.0", "libadwaita >= 1.4.0"]
 
 [package.metadata.rpm.cargo]
 buildflags = ["--release"]
+binary = "fin"
 
 [package.metadata.rpm.targets]
-fin = { path = "/usr/bin/fin" }
+bin = { path = "target/release/fin", install_path = "/usr/bin/fin" }
+assets = { path = "assets", install_path = "/usr/share/fin" }
+
+[package.metadata.rpm.assets]
+config = { src = "assets/config.toml", dest = "/usr/share/fin/config.toml" }
+styles = { src = "assets/style.css", dest = "/usr/share/fin/style.css" }
