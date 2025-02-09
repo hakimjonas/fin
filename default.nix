@@ -5,13 +5,14 @@ rustPlatform.buildRustPackage rec {
   version = "0.1.0";
 
   src = fetchFromGitHub {
-    owner = "yourusername";
+    owner = "hakimjonas";
     repo = "fin";
     rev = "v${version}";
-    sha256 = "sha256-placeholder"; # Replace with the actual hash (use nix-prefetch-git)
+    sha256 = "sha256-placeholder";  # TODO: Run 'nix-prefetch-git' to get the correct hash
   };
 
-  cargoSha256 = "cargo-sha256-placeholder"; # Replace this with the hash computed by Nix
+  # cargoSha256 is computed during the build; update it after the first build.
+  cargoSha256 = "cargo-sha256-placeholder";
 
   nativeBuildInputs = [ gtk4 glib ];
 
@@ -19,6 +20,6 @@ rustPlatform.buildRustPackage rec {
     description = "Finë: a simple GTK4-based session controller for Linux desktops";
     license = stdenv.lib.licenses.mit;
     platforms = stdenv.lib.platforms.linux;
-    homepage = "https://github.com/yourusername/fin";
+    homepage = "https://github.com/hakimjonas/fin";
   };
 }
