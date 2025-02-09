@@ -5,6 +5,17 @@ ASSETS_DIR = "${PROJECT_ROOT}/assets"
 INSTALL_ASSETS_DIR = "/usr/share/fin"
 INSTALL_BIN_DIR = "/usr/local/bin"
 
+[tasks.install-cargo-make]
+description = "Install cargo-make if not already installed"
+script = [
+    "if ! command -v cargo-make &> /dev/null; then",
+    "  echo 'cargo-make not found, installing...'",
+    "  cargo install cargo-make",
+    "else",
+    "  echo 'cargo-make is already installed'",
+    "fi"
+]
+
 [tasks.build-release]
 description = "Build the Finë binary in release mode"
 command = "cargo"
