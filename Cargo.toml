@@ -27,3 +27,12 @@ lto = "thin"
 codegen-units = 1
 panic = "unwind"
 strip = "symbols"
+
+[package.metadata.rpm]
+package = "fin"
+
+[package.metadata.rpm.cargo]
+buildflags = ["--release"]
+
+[package.metadata.rpm.targets]
+fin = { path = "/usr/bin/fin" }
