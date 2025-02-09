@@ -40,7 +40,7 @@ description = "Install the binary to the system binary directory"
 script = [
     "BINARY=${PROJECT_ROOT}/target/release/fin",
     "if [ ! -f \"${BINARY}\" ]; then",
-    "  echo 'Error: Binary not found at' ${BINARY} >&2",
+    "  echo 'Error: Binary not found at ${BINARY}' >&2",
     "  exit 1",
     "fi",
     "echo 'Installing binary to ${INSTALL_BIN_DIR}...'",
@@ -71,7 +71,7 @@ script = [
 description = "Install dependencies on Solus"
 script = [
     "sudo eopkg upgrade",
-    "sudo eopkg it -y libgtk-4-devel"
+    "sudo eopkg install -y libgtk-4-devel"
 ]
 
 [tasks.install-dependencies]
@@ -132,8 +132,6 @@ script = [
     "cargo rpm build --release",
     "echo 'RPM package created'"
 ]
-
-
 
 [tasks.package-solus]
 description = "Package Finë for Solus as a tarball (including Solus manifest if available)"
