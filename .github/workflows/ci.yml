@@ -8,6 +8,8 @@ on:
 
 jobs:
   build:
+    env:
+      RPM: ${{ secrets.RPM }}
     strategy:
       matrix:
         distro: [ ubuntu, fedora, arch, solus, nix ]
