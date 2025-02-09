@@ -38,8 +38,7 @@ license = "MIT"
 url = "https://github.com/hakimjonas/fin"
 # List runtime dependencies; adjust these if your application does not actually use libadwaita.
 requires = ["gtk4 >= 4.12.0", "libadwaita >= 1.4.0"]
-# The installation prefix for the package; standard for most Linux distributions is /usr.
-prefix = "/usr"
+
 
 [package.metadata.rpm.cargo]
 buildflags = ["--release"]
