@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     env:
-      RPM: ${{ secrets.RPM }}
+      RPM: ${{ secrets.RPM_PAT }}
     strategy:
       matrix:
         distro: [ ubuntu, fedora, arch, solus, nix ]

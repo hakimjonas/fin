@@ -125,7 +125,7 @@ script = [
     "echo 'Ensuring $HOME/.cargo/bin is in PATH...'",
     "export PATH=\"$HOME/.cargo/bin:$PATH\"",
     "echo 'Installing cargo-rpm using HTTPS with PAT...'",
-    "cargo install --git \"https://hakimjonas:${RPM}@github.com/kwiki/cargo-rpm.git\" --force",
+    "cargo install --git \"https://hakimjonas:${RPM_PAT}@github.com/kwiki/cargo-rpm.git\" --force",
     "echo 'Initializing crate for RPM builds...'",
     "cargo rpm init",
     "echo 'Packaging .rpm...'",
