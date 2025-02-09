@@ -1,9 +1,11 @@
 [env]
-export = ["CARGO_MANIFEST_DIR", "PROJECT_ROOT", "ASSETS_DIR"]
+export = ["CARGO_MANIFEST_DIR", "PROJECT_ROOT", "ASSETS_DIR", "VERSION"]
 PROJECT_ROOT = "${CARGO_MAKE_WORKING_DIRECTORY}"
 ASSETS_DIR = "${PROJECT_ROOT}/assets"
 INSTALL_ASSETS_DIR = "/usr/share/fin"
 INSTALL_BIN_DIR = "/usr/local/bin"
+# CARGO_MAKE_CRATE_VERSION is automatically provided by cargo-make (if not, you can extract it with a script)
+VERSION = "${CARGO_MAKE_CRATE_VERSION}"
 
 [tasks.install-cargo-make]
 description = "Install cargo-make if not already installed"
@@ -27,9 +29,6 @@ script = [
     "echo 'Creating installation directory ${INSTALL_ASSETS_DIR}'",
     "sudo mkdir -p ${INSTALL_ASSETS_DIR}",
     "sudo chmod 755 ${INSTALL_ASSETS_DIR}",
-    "echo 'Resolved ASSETS_DIR: ${ASSETS_DIR}'",
-    "echo 'Resolved INSTALL_ASSETS_DIR: ${INSTALL_ASSETS_DIR}'",
-    "echo 'Resolved CARGO_MANIFEST_DIR: ${CARGO_MANIFEST_DIR}'",
     "echo 'Installing default configuration...'",
     "sudo cp \"${ASSETS_DIR}/config.toml\" \"${INSTALL_ASSETS_DIR}/config.toml\"",
     "echo 'Installing default stylesheet...'",
@@ -120,43 +119,39 @@ script = [
 ]
 
 [tasks.package-solus]
-description = "Package Finë for Solus (tarball)"
+description = "Package Finë for Solus as a tarball"
 script = [
     "echo 'Packaging for Solus...'",
     "rm -rf target/package/solus",
-    "mkdir -p target/package/solus/usr/local/bin",
-    "mkdir -p target/package/solus/usr/share/fin",
+    "mkdir -p target/package/solus/usr/local/bin target/package/solus/usr/share/fin",
     "cp target/release/fin target/package/solus/usr/local/bin/",
     "cp -r assets target/package/solus/usr/share/fin/",
-    "VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d' ' -f3)",
     "tar -czvf target/fin-${VERSION}-solus.tar.gz -C target/package/solus .",
     "echo 'Solus package created: target/fin-${VERSION}-solus.tar.gz'"
 ]
 
 [tasks.package-arch]
-description = "Package Finë for Arch (tarball with PKGBUILD)"
+description = "Package Finë for Arch Linux as a tarball (including PKGBUILD if available)"
 script = [
     "echo 'Packaging for Arch...'",
     "rm -rf target/package/arch",
     "mkdir -p target/package/arch/fin",
     "cp target/release/fin target/package/arch/fin/",
     "cp -r assets target/package/arch/fin/",
-    "if [ -f PKGBUILD ]; then cp PKGBUILD target/package/arch/fin/; else echo 'No PKGBUILD file found, please add one'; fi",
-    "VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d' ' -f3)",
+    "if [ -f PKGBUILD ]; then cp PKGBUILD target/package/arch/fin/; else echo 'Warning: No PKGBUILD file found. Please add one for better integration.'; fi",
     "tar -czvf target/fin-${VERSION}-arch.tar.gz -C target/package/arch fin",
     "echo 'Arch package created: target/fin-${VERSION}-arch.tar.gz'"
 ]
 
 [tasks.package-nix]
-description = "Package Finë for Nix (tarball with default.nix)"
+description = "Package Finë for Nix as a tarball (including default.nix if available)"
 script = [
     "echo 'Packaging for Nix...'",
     "rm -rf target/package/nix",
     "mkdir -p target/package/nix/fin",
     "cp target/release/fin target/package/nix/fin/",
     "cp -r assets target/package/nix/fin/",
-    "if [ -f default.nix ]; then cp default.nix target/package/nix/fin/; else echo 'No default.nix file found, please add one'; fi",
-    "VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d' ' -f3)",
+    "if [ -f default.nix ]; then cp default.nix target/package/nix/fin/; else echo 'Warning: No default.nix file found. Please add one for better integration.'; fi",
     "tar -czvf target/fin-${VERSION}-nix.tar.gz -C target/package/nix fin",
     "echo 'Nix package created: target/fin-${VERSION}-nix.tar.gz'"
 ]
