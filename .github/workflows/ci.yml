@@ -1,10 +1,10 @@
-name: CI - Multi-Distro Build & Test
+name: CI - Multi-Distro Build & Package
 
 on:
   push:
-    branches: [ automations, trunk ] 
+    branches: [ automations ]
   pull_request:
-    branches: [ automations, trunk ]
+    branches: [ automations ]
   workflow_dispatch:
 
 jobs:
@@ -56,8 +56,7 @@ jobs:
               sudo eopkg install -y libgtk-4-devel
               ;;
             nix)
-              # The nixos/nix container typically has a basic set of tools installed.
-              # Install additional dependencies if needed.
+              # In the nixos/nix container, install libgtk4 if needed.
               nix-env -iA nixpkgs.libgtk4 2>/dev/null || echo "Assuming gtk4 is available"
               ;;
             *)
@@ -72,6 +71,7 @@ jobs:
       - name: Run tests
         run: cargo test
 
+      # Packaging tasks – these steps add the new packaging functionality
       - name: Run packaging tasks
         run: cargo make package
 
