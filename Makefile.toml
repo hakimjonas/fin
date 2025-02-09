@@ -123,10 +123,8 @@ description = "Package Finë as an .rpm using cargo-rpm (experimental)"
 script = [
     "echo 'Ensuring $HOME/.cargo/bin is in PATH...'",
     "export PATH=\"$HOME/.cargo/bin:$PATH\"",
-    "echo 'RPM_PAT is: ${RPM'", # Debug statement
-    "export CARGO_NET_GIT_FETCH_WITH_CLI=true",
-    "echo 'Installing cargo-rpm using HTTPS with a Personal Access Token...'",
-    "cargo install --git https://${RPM_PAT}@github.com/kwiki/cargo-rpm.git --force",
+    "echo 'Installing cargo-rpm from the official cargo registry...'",
+    "cargo install cargo-rpm --force",
     "echo 'Packaging .rpm...'",
     "cargo rpm build --release",
     "echo 'RPM package created'"
