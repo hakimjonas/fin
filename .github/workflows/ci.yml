@@ -1,0 +1,72 @@
+name: CI - Multi-Distro Build & Test
+
+on:
+  push:
+    branches: [ automations ]
+  pull_request:
+    branches: [ automations ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        distro: [ ubuntu, fedora, arch, solus ]
+    runs-on: ubuntu-latest
+    container:
+      # Use the appropriate container image based on the distro.
+      image: ${{
+        matrix.distro == 'ubuntu' && 'ubuntu:latest' ||
+        matrix.distro == 'fedora' && 'fedora:latest' ||
+        matrix.distro == 'arch' && 'archlinux:latest' ||
+        matrix.distro == 'solus' && 'silkeh/solus:devel'
+    }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Rust toolchain
+        # Using the same approach for all distros.
+        run: |
+          if ! command -v rustc >/dev/null; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+            . "$HOME/.cargo/env"
+          else
+            . "$HOME/.cargo/env"
+          fi
+          rustup update stable
+          rustup default stable
+
+      - name: Install system dependencies
+        run: |
+          case "${{ matrix.distro }}" in
+            ubuntu)
+              sudo apt-get update
+              sudo apt-get install -y libgtk-4-dev build-essential pkg-config
+              ;;
+            fedora)
+              sudo dnf install -y gtk4-devel pkgconf-pkg-config
+              ;;
+            arch)
+              sudo pacman -Syu --noconfirm gtk4 base-devel pkgconf
+              ;;
+            solus)
+              sudo eopkg upgrade
+              sudo eopkg it -y libgtk-4-devel
+              ;;
+            *)
+              echo "Unsupported distro: ${{ matrix.distro }}"
+              exit 1
+              ;;
+          esac
+
+      - name: Build project in release mode
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Upload release binary artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: fin-${{ matrix.distro }}
+          path: target/release/fin

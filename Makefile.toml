@@ -108,8 +108,59 @@ script = [
 description = "Build and install Finë (binary and assets)"
 dependencies = ["install-dependencies", "build-release", "copy-assets", "install-bin"]
 
-[tasks.package]
-description = "Package the application (placeholder task)"
+# --- Packaging tasks ---
+
+[tasks.package-deb]
+description = "Package Finë as a .deb using cargo-deb"
 script = [
-    "echo 'Packaging is not fully implemented yet.'"
+    "echo 'Installing cargo-deb (if needed)...'",
+    "cargo install cargo-deb --version 1.42.0 || true",
+    "echo 'Packaging .deb...'",
+    "cargo deb --no-build"
 ]
+
+[tasks.package-solus]
+description = "Package Finë for Solus (tarball)"
+script = [
+    "echo 'Packaging for Solus...'",
+    "rm -rf target/package/solus",
+    "mkdir -p target/package/solus/usr/local/bin",
+    "mkdir -p target/package/solus/usr/share/fin",
+    "cp target/release/fin target/package/solus/usr/local/bin/",
+    "cp -r assets target/package/solus/usr/share/fin/",
+    "VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d' ' -f3)",
+    "tar -czvf target/fin-${VERSION}-solus.tar.gz -C target/package/solus .",
+    "echo 'Solus package created: target/fin-${VERSION}-solus.tar.gz'"
+]
+
+[tasks.package-arch]
+description = "Package Finë for Arch (tarball with PKGBUILD)"
+script = [
+    "echo 'Packaging for Arch...'",
+    "rm -rf target/package/arch",
+    "mkdir -p target/package/arch/fin",
+    "cp target/release/fin target/package/arch/fin/",
+    "cp -r assets target/package/arch/fin/",
+    "if [ -f PKGBUILD ]; then cp PKGBUILD target/package/arch/fin/; else echo 'No PKGBUILD file found, please add one'; fi",
+    "VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d' ' -f3)",
+    "tar -czvf target/fin-${VERSION}-arch.tar.gz -C target/package/arch fin",
+    "echo 'Arch package created: target/fin-${VERSION}-arch.tar.gz'"
+]
+
+[tasks.package-nix]
+description = "Package Finë for Nix (tarball with default.nix)"
+script = [
+    "echo 'Packaging for Nix...'",
+    "rm -rf target/package/nix",
+    "mkdir -p target/package/nix/fin",
+    "cp target/release/fin target/package/nix/fin/",
+    "cp -r assets target/package/nix/fin/",
+    "if [ -f default.nix ]; then cp default.nix target/package/nix/fin/; else echo 'No default.nix file found, please add one'; fi",
+    "VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d' ' -f3)",
+    "tar -czvf target/fin-${VERSION}-nix.tar.gz -C target/package/nix fin",
+    "echo 'Nix package created: target/fin-${VERSION}-nix.tar.gz'"
+]
+
+[tasks.package]
+description = "Package Finë for distribution (.deb, Solus, Arch, and Nix)"
+dependencies = ["build-release", "package-deb", "package-solus", "package-arch", "package-nix"]
