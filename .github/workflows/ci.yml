@@ -5,6 +5,7 @@ on:
     branches: [ automations ]
   pull_request:
     branches: [ automations ]
+  workflow_dispatch:
 
 jobs:
   build:
