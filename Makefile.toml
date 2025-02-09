@@ -124,8 +124,10 @@ dependencies = ["build-release"]
 script = [
     "echo 'Ensuring $HOME/.cargo/bin is in PATH...'",
     "export PATH=\"$HOME/.cargo/bin:$PATH\"",
+    "echo 'Forcing Cargo to use the Git CLI for fetching...'",
+    "export CARGO_NET_GIT_FETCH_WITH_CLI=true",
     "echo 'Installing cargo-rpm using HTTPS with PAT...'",
-    "cargo install --git https://hakimjonas:$RPM@github.com/kwiki/cargo-rpm.git --force",
+    "cargo install --git \"https://hakimjonas:${RPM}@github.com/kwiki/cargo-rpm.git\" --force",
     "echo 'Initializing crate for RPM builds...'",
     "cargo rpm init",
     "echo 'Packaging .rpm...'",
