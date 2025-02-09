@@ -8,7 +8,7 @@ rustPlatform.buildRustPackage rec {
     owner = "hakimjonas";
     repo = "fin";
     rev = "v${version}";
-    sha256 = "sha256-placeholder";  # TODO: Run 'nix-prefetch-git' to get the correct hash
+    sha256 = "1r7dh831cgqvn18418jxxasd7gl3c77kj5frvp7ydcy31sjgxh53";  # TODO: Run 'nix-prefetch-git' to get the correct hash
   };
 
   # cargoSha256 is computed during the build; update it after the first build.

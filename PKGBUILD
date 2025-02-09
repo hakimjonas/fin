@@ -10,7 +10,7 @@ depends=('gtk4')
 makedepends=('cargo' 'rust' 'git')
 # Download the source tarball from GitHub.
 source=("$pkgname-$pkgver.tar.gz::https://github.com/hakimjonas/fin/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')  # TODO: Replace with a proper sha256 sum computed via 'sha256sum'
+sha256sums=('a3c0fea40ec3b3e6cfddd91539cf6183bed3b4ea5da24050b01b3f160682ede4')  # TODO: Replace with a proper sha256 sum computed via 'sha256sum'
 
 build() {
   cd "$srcdir/fin-$pkgver"  # Ensure that the extracted directory is named as expected.
