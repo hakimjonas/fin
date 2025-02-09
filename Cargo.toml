@@ -29,13 +29,16 @@ panic = "abort"
 strip = "symbols"
 
 [package.metadata.rpm]
+# RPM metadata for cargo-rpm; these fields help generate a standard RPM package.
 name = "fin"
 version = "0.1.0"
 release = "1%{?dist}"
 summary = "GTK4-based session controller"
 license = "MIT"
 url = "https://github.com/hakimjonas/fin"
+# List runtime dependencies; adjust these if your application does not actually use libadwaita.
 requires = ["gtk4 >= 4.12.0", "libadwaita >= 1.4.0"]
+# The installation prefix for the package; standard for most Linux distributions is /usr.
 prefix = "/usr"
 
 [package.metadata.rpm.cargo]
@@ -43,9 +46,12 @@ buildflags = ["--release"]
 binary = "fin"
 
 [package.metadata.rpm.targets]
+# Define where the built binary should be installed.
 bin = { path = "target/release/fin", install_path = "/usr/bin/fin" }
+# Define the directory for additional assets.
 assets = { path = "assets", install_path = "/usr/share/fin" }
 
 [package.metadata.rpm.assets]
+# Optionally override individual asset installation paths.
 config = { src = "assets/config.toml", dest = "/usr/share/fin/config.toml" }
 styles = { src = "assets/style.css", dest = "/usr/share/fin/style.css" }
