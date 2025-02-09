@@ -126,11 +126,12 @@ script = [
     "echo 'Forcing Cargo to use the Git CLI for fetching...'",
     "export CARGO_NET_GIT_FETCH_WITH_CLI=true",
     "echo 'Installing cargo-rpm using HTTPS with a Personal Access Token...'",
-    "cargo install --git https://$RPM_PAT@github.com/kwiki/cargo-rpm.git --force",
+    "cargo install --git https://${RPM}@github.com/kwiki/cargo-rpm.git --force",
     "echo 'Packaging .rpm...'",
     "cargo rpm build --release",
     "echo 'RPM package created'"
 ]
+
 
 
 
