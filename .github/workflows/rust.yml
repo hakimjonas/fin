@@ -2,36 +2,84 @@ name: CI
 
 on:
   push:
-    branches: [ trunk ]
+    branches: [ automations ]
   pull_request:
-    branches: [ trunk ]
+    branches: [ automations ]
 
 jobs:
-  build:
+  build-ubuntu:
     runs-on: ubuntu-latest
-    container:
-      image: hakimjonas/fin-gtk:latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Cache Cargo registry and git index
-        uses: actions/cache@v3
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          toolchain: stable
 
-      - name: Cache Cargo build artifacts
-        uses: actions/cache@v3
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev
+
+      - name: Build project in release mode
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test
+
+  build-fedora:
+    runs-on: fedora-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
         with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          toolchain: stable
 
-      - name: Set default Rust toolchain to stable
-        run: rustup default stable
+      - name: Install dependencies
+        run: sudo dnf install -y gtk4-devel
+
+      - name: Build project in release mode
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test
+
+  build-arch:
+    runs-on: arch-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install dependencies
+        run: sudo pacman -S --noconfirm gtk4
+
+      - name: Build project in release mode
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test
+
+  build-solus:
+    runs-on: solus-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install dependencies
+        run: sudo eopkg up && sudo eopkg it -y libgtk-4-devel
 
       - name: Build project in release mode
         run: cargo build --release

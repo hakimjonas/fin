@@ -49,9 +49,64 @@ script = [
     "sudo chmod 755 ${INSTALL_BIN_DIR}/fin"
 ]
 
+[tasks.install-dependencies-ubuntu]
+description = "Install dependencies on Ubuntu"
+script = [
+    "sudo apt-get update",
+    "sudo apt-get install -y libgtk-4-dev"
+]
+
+[tasks.install-dependencies-fedora]
+description = "Install dependencies on Fedora"
+script = [
+    "sudo dnf install -y gtk4-devel"
+]
+
+[tasks.install-dependencies-arch]
+description = "Install dependencies on Arch Linux"
+script = [
+    "sudo pacman -S --noconfirm gtk4"
+]
+
+[tasks.install-dependencies-solus]
+description = "Install dependencies on Solus"
+script = [
+    "sudo eopkg up",
+    "sudo eopkg it -y libgtk-4-devel"
+]
+
+[tasks.install-dependencies]
+description = "Install dependencies based on the detected distribution"
+script = [
+    "if [ -f /etc/os-release ]; then",
+    "  . /etc/os-release",
+    "  case $ID in",
+    "    ubuntu|debian)",
+    "      cargo make install-dependencies-ubuntu",
+    "      ;;",
+    "    fedora)",
+    "      cargo make install-dependencies-fedora",
+    "      ;;",
+    "    arch)",
+    "      cargo make install-dependencies-arch",
+    "      ;;",
+    "    solus)",
+    "      cargo make install-dependencies-solus",
+    "      ;;",
+    "    *)",
+    "      echo 'Unsupported distribution: $ID' >&2",
+    "      exit 1",
+    "      ;;",
+    "  esac",
+    "else",
+    "  echo 'Cannot detect distribution' >&2",
+    "  exit 1",
+    "fi"
+]
+
 [tasks.install]
 description = "Build and install Finë (binary and assets)"
-dependencies = ["build-release", "copy-assets", "install-bin"]
+dependencies = ["install-dependencies", "build-release", "copy-assets", "install-bin"]
 
 [tasks.package]
 description = "Package the application (placeholder task)"
