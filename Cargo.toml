@@ -11,22 +11,21 @@ repository = "https://github.com/hakimjonas/fin"
 documentation = "https://docs.rs/fin"
 
 [dependencies]
-gtk4 = { version = "0.9.3", features = ["v4_12"] }  # Latest stable with GTK 4.12 features
-glib = "0.20.7"                     # Updated to match GTK4 version
-anyhow = "1.0.81"                   # Updated error handling
-im = { version = "15.1.0", features = ["serde"] }  # Latest immutable collections
+gtk4 = { version = "0.9.3", features = ["v4_12"] }
+glib = "0.20.7"
+anyhow = "1.0.81"
+im = { version = "15.1.0", features = ["serde"] }
 serde = { version = "1.0.203", features = ["derive"] }
-toml = "0.8.14"                     # Updated TAML support
-clap = { version = "4.5.4", features = ["derive"] }  # Latest CLI parser
+toml = "0.8.14"
+clap = { version = "4.5.4", features = ["derive"] }
 log = "0.4.21"
-env_logger = "0.11.3"               # Updated logging stack
-
+env_logger = "0.11.3"
 
 [profile.release]
-opt-level = "z"                     # Optimize for size
+opt-level = "z"
 lto = "thin"
 codegen-units = 1
-panic = "abort"                     # More secure than unwind
+panic = "abort"
 strip = "symbols"
 
 [package.metadata.rpm]
@@ -37,6 +36,7 @@ summary = "GTK4-based session controller"
 license = "MIT"
 url = "https://github.com/hakimjonas/fin"
 requires = ["gtk4 >= 4.12.0", "libadwaita >= 1.4.0"]
+prefix = "/usr"
 
 [package.metadata.rpm.cargo]
 buildflags = ["--release"]
