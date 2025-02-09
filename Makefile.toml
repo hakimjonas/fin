@@ -126,11 +126,12 @@ script = [
     "export PATH=\"$HOME/.cargo/bin:$PATH\"",
     "echo 'Installing cargo-rpm from the official cargo registry...'",
     "cargo install cargo-rpm --force",
+    "echo 'Initializing crate for RPM builds...'",
+    "cargo rpm init",
     "echo 'Packaging .rpm...'",
     "cargo rpm build",
     "echo 'RPM package created'"
 ]
-
 
 [tasks.package-solus]
 description = "Package Finë for Solus as a tarball (including Solus manifest if available)"
