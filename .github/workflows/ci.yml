@@ -22,7 +22,7 @@ jobs:
         matrix.distro == 'arch' && 'archlinux:latest' ||
         matrix.distro == 'solus' && 'silkeh/solus:devel' ||
         matrix.distro == 'nix' && 'nixos/nix'
-      }}
+        }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
