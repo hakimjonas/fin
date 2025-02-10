@@ -37,16 +37,16 @@ jobs:
         run: |
           case "${{ matrix.distro }}" in
             ubuntu)
-              sudo apt-get update && sudo apt-get install -y curl
+              apt-get update && apt-get install -y curl
               ;;
             fedora)
-              sudo dnf install -y curl
+              dnf install -y curl
               ;;
             arch)
-              sudo pacman -Syu --noconfirm curl
+              pacman -Syu --noconfirm curl
               ;;
             solus)
-              sudo eopkg upgrade && sudo eopkg it -y curl
+              eopkg upgrade && eopkg it -y curl
               ;;
             nix)
               nix-channel --update && nix-env -iA nixpkgs.curl
@@ -69,16 +69,16 @@ jobs:
         run: |
           case "${{ matrix.distro }}" in
             ubuntu)
-              sudo apt-get update && sudo apt-get install -y libgtk-4-dev build-essential pkg-config
+              apt-get update && apt-get install -y libgtk-4-dev build-essential pkg-config
               ;;
             fedora)
-              sudo dnf install -y gtk4-devel pkgconf-pkg-config
+              dnf install -y gtk4-devel pkgconf-pkg-config
               ;;
             arch)
-              sudo pacman -Syu --noconfirm gtk4 base-devel pkgconf
+              pacman -Syu --noconfirm gtk4 base-devel pkgconf
               ;;
             solus)
-              sudo eopkg upgrade && sudo eopkg it -y libgtk-4-devel
+              eopkg upgrade && eopkg it -y libgtk-4-devel
               ;;
             nix)
               nix-channel --update && nix-env -iA nixpkgs.gtk4 nixpkgs.pkg-config
