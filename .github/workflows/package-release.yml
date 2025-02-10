@@ -1,0 +1,44 @@
+name: Build and Package (Release Mode)
+
+on:
+  workflow_call:
+    # No additional triggers—this workflow is meant to be called from another workflow.
+    # You can define inputs here if needed.
+    inputs:
+    # (Optional) You could add an input for choosing packaging options.
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
+
+      - name: Build project in release mode
+        run: cargo build --release
+
+      - name: Run packaging tasks
+        run: cargo make package
+
+      - name: Set artifact path
+        id: set-artifact-path
+        run: |
+          # For simplicity, we assume the packaging artifacts for release use the ubuntu pattern.
+          # (If you need to support multiple distros here, you can adjust or pass an input.)
+          echo "path=target/debian/fin_*.deb" >> $GITHUB_OUTPUT
+
+      - name: Upload packaging artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fin-package-release
+          path: ${{ steps.set-artifact-path.outputs.path }}
