@@ -26,15 +26,35 @@ jobs:
       - name: Run packaging tasks
         run: cargo make package
 
-      - name: Set artifact path
+      - name: Set artifact paths
         id: set-artifact-path
         run: |
-          # For simplicity, we assume the packaging artifacts for release use the ubuntu pattern.
-          # (If you need to support multiple distros here, you can adjust or pass an input.)
-          echo "path=target/debian/fin_*.deb" >> $GITHUB_OUTPUT
+          # Set outputs for all artifact patterns.
+          echo "debian=target/debian/fin_*.deb" >> $GITHUB_OUTPUT
+          echo "rpm=target/fin-*-rpm.tar.gz" >> $GITHUB_OUTPUT
+          echo "solus=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT
+          echo "arch=target/fin-*-arch.tar.gz" >> $GITHUB_OUTPUT
 
-      - name: Upload packaging artifact
+      - name: Upload Debian packaging artifact
         uses: actions/upload-artifact@v4
         with:
-          name: fin-package-release
-          path: ${{ steps.set-artifact-path.outputs.path }}
+          name: fin-package-debian
+          path: ${{ steps.set-artifact-path.outputs.debian }}
+
+      - name: Upload RPM packaging artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fin-package-rpm
+          path: ${{ steps.set-artifact-path.outputs.rpm }}
+
+      - name: Upload Solus packaging artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fin-package-solus
+          path: ${{ steps.set-artifact-path.outputs.solus }}
+
+      - name: Upload Arch packaging artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fin-package-arch
+          path: ${{ steps.set-artifact-path.outputs.arch }}
