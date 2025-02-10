@@ -101,11 +101,11 @@ jobs:
               pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
               ;;
             solus)
-              eopkg up -y && eopkg it -y curl gtk4-devel gcc
+              eopkg up -y && eopkg it -y curl libgtk-4-devel gcc
               ;;
             nix)
               nix-channel --update && \
-              nix-env -iA nixpkgs.curl nixpkgs.gtk4 nixpkgs.pkg-config nixpkgs.gcc
+              nix-env -iA nixpkgs.curl nixpkgs.gtk4 nixpkgs.pkg-config nixpkgs.gcc nixpkgs.nodejs nixpkgs.npm
               ;;
             *)
               echo "Unsupported distro: ${{ matrix.distro }}"
