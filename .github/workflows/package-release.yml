@@ -14,11 +14,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Install system dependencies in the correct order
+      # 2. Install system dependencies in the correct order, including RPM build tools
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl libgtk-4-dev build-essential pkg-config
+          sudo apt-get install -y curl libgtk-4-dev build-essential pkg-config rpm
 
       # 3. Set PKG_CONFIG_PATH so that pkg-config can locate glib-2.0.pc
       - name: Set PKG_CONFIG_PATH
