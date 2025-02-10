@@ -9,34 +9,32 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig
     steps:
-      # 1. Checkout code (same as in CI)
+      # 1. Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Install system dependencies in the correct order, including RPM build tools
+      # 2. Install system dependencies (including RPM build tools)
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y curl libgtk-4-dev build-essential pkg-config rpm
 
-      # 3. Set PKG_CONFIG_PATH so that pkg-config can locate glib-2.0.pc
-      - name: Set PKG_CONFIG_PATH
-        run: echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
+      # 3. (Re)confirm PKG_CONFIG_PATH (optional, since set in env above)
+      - name: Confirm PKG_CONFIG_PATH
+        run: echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
 
-      # 4. Install Rust toolchain (using the actions-rs/toolchain action)
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          profile: minimal
+      # 4. Set up Rust toolchain (using rustup already on the runner)
+      - name: Set up Rust toolchain
+        run: rustup default stable
 
       # 5. Install cargo-make (needed for packaging tasks)
       - name: Install cargo-make
         run: cargo install cargo-make
 
-      # 6. Install clippy and run it (as in your CI workflow)
+      # 6. Install clippy and run it
       - name: Install clippy
         run: rustup component add clippy
       - name: Run Clippy
@@ -63,7 +61,7 @@ jobs:
           echo "solus=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT
           echo "arch=target/fin-*-arch.tar.gz" >> $GITHUB_OUTPUT
 
-      # 11. Upload artifacts
+      # 11. Upload artifacts for each distribution
       - name: Upload Debian artifact
         uses: actions/upload-artifact@v4
         with:
