@@ -3,10 +3,10 @@ name: CI - Multi-Distro Build & Test
 on:
   push:
     branches:
-      - trunk
+      - automations
   pull_request:
     branches:
-      - trunk
+      - automations
   workflow_dispatch: { }
 
 jobs:
