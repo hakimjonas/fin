@@ -20,7 +20,8 @@ jobs:
           - distro: solus
             container: silkeh/solus:devel
           - distro: nix
-            container: ghcr.io/jyn514/nix-node:latest
+            container: nixery.dev/nix/nodejs/curl/gtk4/pkg-config/gcc
+
 
     runs-on: ubuntu-latest
     container:
