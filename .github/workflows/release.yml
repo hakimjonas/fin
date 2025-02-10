@@ -9,7 +9,7 @@ on:
 jobs:
   build_and_package:
     # Call the reusable workflow from your repository.
-    # Note the correct syntax without "https://github.com/"
+    # Note: using your default branch "trunk" here.
     uses: hakimjonas/fin/.github/workflows/package-release.yml@trunk
     secrets:
       RELEASE: ${{ secrets.RELEASE }}
@@ -20,6 +20,27 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      # Download artifacts that were uploaded in the build_and_package job.
+      - name: Download Debian Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fin-package-debian
+
+      - name: Download RPM Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fin-package-rpm
+
+      - name: Download Solus Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fin-package-solus
+
+      - name: Download Arch Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: fin-package-arch
 
       - name: Install release dependencies
         run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev libcairo2-dev
@@ -37,13 +58,10 @@ jobs:
         env:
           RELEASE: ${{ secrets.RELEASE }}
 
-      - name: Upload Release Artifacts
+      - name: Upload Release Artifacts using GitHub CLI
         run: |
           gh release upload "${{ github.ref }}" \
-            target/debian/fin_*.deb \
-            target/fin-*-rpm.tar.gz \
-            target/fin-*-solus.tar.gz \
-            target/fin-*-arch.tar.gz
+            fin_*.deb fin_*-rpm.tar.gz fin_*-solus.tar.gz fin_*-arch.tar.gz
         env:
           RELEASE: ${{ secrets.RELEASE }}
 
