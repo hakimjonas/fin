@@ -3,10 +3,10 @@ name: CI - Multi-Distro Build & Test
 on:
   push:
     branches:
-      - automations
+      - trunk
   pull_request:
     branches:
-      - automations
+      - trunk
   workflow_dispatch: {}
 
 jobs:
@@ -60,10 +60,12 @@ jobs:
       - name: Install Rust via rustup
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          # Make Cargo's bin directory available in subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          # Source Cargo's environment so that rustup is available immediately
+          . "$HOME/.cargo/env"
           rustup update stable
           rustup default stable
+          # Ensure Cargo's bin directory is added to PATH for subsequent steps
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Install system dependencies
         run: |
