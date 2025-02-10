@@ -2,6 +2,8 @@ name: Release
 
 on:
   push:
+    branches:
+      - release
     tags:
       - 'v*.*.*'
   workflow_dispatch:
@@ -27,8 +29,10 @@ jobs:
         run: cargo make package
 
       - name: Install GitHub CLI
+        id: install-gh-cli
         run: |
           curl -fsSL https://cli.github.com/packages/install.sh | sh
+        continue-on-error: true
 
       - name: Create Release using GitHub CLI
         run: |
@@ -36,7 +40,7 @@ jobs:
             --title "Release ${{ github.ref }}" \
             --notes "Release notes go here"
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Release Artifacts
         run: |
@@ -46,4 +50,10 @@ jobs:
             target/fin-*-solus.tar.gz \
             target/fin-*-arch.tar.gz
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Release
+        run: |
+          gh release publish "${{ github.ref }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
