@@ -1,4 +1,4 @@
-name: CI - Multi-Distro Build & Package
+name: CI - Multi-Distro Build & Test
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
         distro: [ ubuntu, fedora, arch, solus, nix ]
     runs-on: ubuntu-latest
     container:
-      image: ${{ 
+      image: ${{
         matrix.distro == 'ubuntu' && 'ubuntu:latest' ||
         matrix.distro == 'fedora' && 'fedora:latest' ||
         matrix.distro == 'arch' && 'archlinux:latest' ||
@@ -53,10 +53,11 @@ jobs:
               ;;
             solus)
               sudo eopkg upgrade
-              sudo eopkg install -y libgtk-4-devel
+              sudo eopkg it -y libgtk-4-devel
               ;;
             nix)
-              # In the nixos/nix container, install libgtk4 if needed.
+              # The nixos/nix container typically has a basic set of tools installed.
+              # Install additional dependencies if needed (for example, via 'nix-env').
               nix-env -iA nixpkgs.libgtk4 2>/dev/null || echo "Assuming gtk4 is available"
               ;;
             *)
@@ -71,7 +72,6 @@ jobs:
       - name: Run tests
         run: cargo test
 
-      # Packaging tasks – these steps add the new packaging functionality
       - name: Run packaging tasks
         run: cargo make package
 
