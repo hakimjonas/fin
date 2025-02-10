@@ -7,8 +7,6 @@ on:
 
 jobs:
   build:
-    env:
-      RPM: ${{ secrets.RPM_PAT }}
     strategy:
       fail-fast: false
       matrix:
@@ -31,35 +29,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Cache system dependencies
+      - name: Cache system dependencies (apt)
         if: matrix.distro == 'ubuntu'
         uses: actions/cache@v3
         with:
           path: /var/cache/apt
           key: ${{ runner.os }}-apt-cache-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cache system dependencies
+      - name: Cache system dependencies (dnf)
         if: matrix.distro == 'fedora'
         uses: actions/cache@v3
         with:
           path: /var/cache/dnf
           key: ${{ runner.os }}-dnf-cache-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cache system dependencies
+      - name: Cache system dependencies (pacman)
         if: matrix.distro == 'arch'
         uses: actions/cache@v3
         with:
           path: /var/cache/pacman
           key: ${{ runner.os }}-pacman-cache-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cache system dependencies
+      - name: Cache system dependencies (eopkg)
         if: matrix.distro == 'solus'
         uses: actions/cache@v3
         with:
           path: /var/cache/eopkg
           key: ${{ runner.os }}-eopkg-cache-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cache system dependencies
+      - name: Cache system dependencies (nix)
         if: matrix.distro == 'nix'
         uses: actions/cache@v3
         with:
@@ -108,9 +106,11 @@ jobs:
       - name: Install Rust via rustup
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          # Source Cargo's environment so rustup and cargo are immediately available
           . "$HOME/.cargo/env"
           rustup update stable
           rustup default stable
+          # Ensure Cargo's bin directory is in PATH for subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Install cargo-make
