@@ -9,7 +9,7 @@ on:
 jobs:
   build_and_package:
     # Call the reusable workflow from your repository.
-    # Note: using your default branch "trunk" here.
+    # Using your default branch "trunk" since that's where the file is.
     uses: hakimjonas/fin/.github/workflows/package-release.yml@trunk
     secrets:
       RELEASE: ${{ secrets.RELEASE }}
@@ -17,11 +17,13 @@ jobs:
   release:
     needs: build_and_package
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # This allows the job to create releases.
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Download artifacts that were uploaded in the build_and_package job.
+      # Download artifacts produced by build_and_package job.
       - name: Download Debian Artifact
         uses: actions/download-artifact@v4
         with:
@@ -57,7 +59,6 @@ jobs:
             --notes "Release notes go here"
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE: ${{ secrets.RELEASE }}
 
       - name: Upload Release Artifacts using GitHub CLI
         run: |
@@ -65,10 +66,8 @@ jobs:
             fin_*.deb fin_*-rpm.tar.gz fin_*-solus.tar.gz fin_*-arch.tar.gz
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE: ${{ secrets.RELEASE }}
 
       - name: Publish Release
         run: gh release publish "${{ github.ref }}"
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE: ${{ secrets.RELEASE }}
