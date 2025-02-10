@@ -19,8 +19,6 @@ jobs:
             container: archlinux:latest
           - distro: solus
             container: hakimjonas/fin-gtk:latest
-          - distro: nix
-            container: nixery.dev/shell/git/gcc:latest
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.container }}
@@ -65,15 +63,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-eopkg-cache-
 
-      - name: Cache system dependencies (nix)
-        if: matrix.distro == 'nix'
-        uses: actions/cache@v3
-        with:
-          path: /nix/store
-          key: ${{ runner.os }}-nix-store-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-nix-store-
-
       - name: Cache Cargo registry and git index
         uses: actions/cache@v3
         with:
@@ -103,10 +92,6 @@ jobs:
             solus)
               eopkg up -y && eopkg it -y curl libgtk-4-devel gcc
               ;;
-            nix)
-              nix-channel --update && \
-              nix-env -iA nixpkgs.curl nixpkgs.gtk4 nixpkgs.pkg-config nixpkgs.gcc nixpkgs.nodejs nixpkgs.npm
-              ;;
             *)
               echo "Unsupported distro: ${{ matrix.distro }}"
               exit 1
@@ -120,7 +105,7 @@ jobs:
           override: true
           profile: minimal
 
-      - name: Install cargo-make and clippy
+      - name: Install cargo-make
         run: cargo install cargo-make
 
       - name: Install clippy
@@ -133,20 +118,14 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-        env:
-          CC: ${{ matrix.distro == 'nix' && 'gcc' || '' }}
 
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
           command: test
-        env:
-          CC: ${{ matrix.distro == 'nix' && 'gcc' || '' }}
 
       - name: Run packaging tasks
-        run: |
-          if [ "${{ matrix.distro }}" = "nix" ]; then export CC=gcc; fi
-          cargo make package
+        run: cargo make package
 
       - name: Set artifact path
         id: set-artifact-path
@@ -163,9 +142,6 @@ jobs:
               ;;
             solus)
               echo "path=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT
-              ;;
-            nix)
-              echo "path=target/fin-*-nix.tar.gz" >> $GITHUB_OUTPUT
               ;;
           esac
 
