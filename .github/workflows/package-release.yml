@@ -16,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Install system dependencies in the correct order (including rpm build tools)
+      # 2. Install system dependencies in the correct order (including RPM build tools)
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -51,6 +51,15 @@ jobs:
       # 9. Run packaging tasks
       - name: Run packaging tasks
         run: cargo make package
+
+      # 9.5 Sanitize RPM filename (remove invalid characters)
+      - name: Sanitize RPM filename
+        run: |
+          for f in target/generate-rpm/fin*.rpm; do
+            newf=$(echo "$f" | sed 's/%{?dist}//g');
+            echo "Renaming $f to $newf";
+            mv "$f" "$newf";
+          done
 
       # 10. Set artifact paths for all four distributions
       - name: Set artifact paths
