@@ -105,7 +105,7 @@ jobs:
               ;;
             nix)
               nix-channel --update && \
-              nix-env -iA nixpkgs.curl nixpkgs.gtk4 nixpkgs.pkg-config nixpkgs.gcc nixpkgs.nodejs
+              nix-env -iA nixpkgs.curl nixpkgs.gtk4 nixpkgs.pkg-config nixpkgs.gcc
               ;;
             *)
               echo "Unsupported distro: ${{ matrix.distro }}"
