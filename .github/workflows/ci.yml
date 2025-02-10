@@ -20,7 +20,7 @@ jobs:
           - distro: solus
             container: hakimjonas/fin-gtk:latest
           - distro: nix
-            container: nixery.dev/shell/git/nodejs/curl/gtk4/pkg-config/gcc:latest 
+            container: nixery.dev/shell/git/gcc:latest 
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.container }}
