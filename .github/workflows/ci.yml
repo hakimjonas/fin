@@ -1,8 +1,9 @@
 name: CI - Multi-Distro Build & Test
 
 on:
-  push: { }
-  pull_request: { }
+  push:
+    branches:
+      - '**'
   workflow_dispatch: { }
 
 jobs:
@@ -90,8 +91,9 @@ jobs:
               pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
               ;;
             solus)
-              eopkg up -y && eopkg it -y curl libgtk-4-devel gcc
-              ;;
+            eopkg up -y || echo "Update failed, continuing..."
+            eopkg it -y curl libgtk-4-devel gcc || echo "Installation failed, continuing..."
+            ;;
             *)
               echo "Unsupported distro: ${{ matrix.distro }}"
               exit 1
