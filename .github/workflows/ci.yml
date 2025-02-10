@@ -18,10 +18,10 @@ jobs:
           - distro: arch
             container: archlinux:latest
           - distro: solus
-            container: silkeh/solus:devel
+            container: hakimjonas/fin-gtk:latest
           - distro: nix
             container: nixery.dev/nix/nodejs/curl/gtk4/pkg-config/gcc:latest
-            options: --entrypoint "sh"
+            options: --entrypoint "sh -c 'while true; do sleep 1; done'"
 
     runs-on: ubuntu-latest
     container:
