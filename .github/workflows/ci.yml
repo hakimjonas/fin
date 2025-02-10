@@ -103,16 +103,14 @@ jobs:
               echo "Unsupported distro: ${{ matrix.distro }}"
               exit 1
               ;;
-          esac    
+          esac
 
       - name: Install Rust via rustup
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          # Source Cargo's environment so rustup and cargo are immediately available
           . "$HOME/.cargo/env"
           rustup update stable
           rustup default stable
-          # Ensure Cargo's bin directory is in PATH for subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Install cargo-make
