@@ -16,25 +16,23 @@ jobs:
         distro: [ ubuntu, fedora, arch, solus, nix ]
     runs-on: ubuntu-latest
     container:
-      image: ${{
+      image: ${{ 
         matrix.distro == 'ubuntu' && 'ubuntu:latest' ||
         matrix.distro == 'fedora' && 'fedora:latest' ||
         matrix.distro == 'arch' && 'archlinux:latest' ||
         matrix.distro == 'solus' && 'silkeh/solus:devel' ||
         matrix.distro == 'nix' && 'nixos/nix'
-        }}
+      }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Rust toolchain
         run: |
-          if ! command -v rustc >/dev/null; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-            . "$HOME/.cargo/env"
-          else
-            . "$HOME/.cargo/env"
-          fi
+          # Install curl first (handled in dependencies step)
+          . "$HOME/.cargo/env" 2>/dev/null || true
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+          . "$HOME/.cargo/env"
           rustup update stable
           rustup default stable
 
@@ -42,23 +40,22 @@ jobs:
         run: |
           case "${{ matrix.distro }}" in
             ubuntu)
-              sudo apt-get update
-              sudo apt-get install -y libgtk-4-dev build-essential pkg-config
+              apt-get update
+              apt-get install -y curl libgtk-4-dev build-essential pkg-config
               ;;
             fedora)
-              sudo dnf install -y gtk4-devel pkgconf-pkg-config
+              dnf install -y curl gtk4-devel pkgconf-pkg-config
               ;;
             arch)
-              sudo pacman -Syu --noconfirm gtk4 base-devel pkgconf
+              pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
               ;;
             solus)
-              sudo eopkg upgrade
-              sudo eopkg it -y libgtk-4-devel
+              eopkg upgrade
+              eopkg it -y curl libgtk-4-devel
               ;;
             nix)
-              # The nixos/nix container typically has a basic set of tools installed.
-              # Install additional dependencies if needed (for example, via 'nix-env').
-              nix-env -iA nixpkgs.libgtk4 2>/dev/null || echo "Assuming gtk4 is available"
+              nix-channel --update
+              nix-env -iA nixpkgs.curl nixpkgs.gtk4 nixpkgs.pkg-config
               ;;
             *)
               echo "Unsupported distro: ${{ matrix.distro }}"
@@ -75,13 +72,19 @@ jobs:
       - name: Run packaging tasks
         run: cargo make package
 
+      - name: Set artifact path
+        id: set-artifact-path
+        run: |
+          case "${{ matrix.distro }}" in
+            ubuntu)   echo "path=target/debian/fin_*.deb" >> $GITHUB_OUTPUT ;;
+            fedora)   echo "path=target/fin-*-rpm.tar.gz" >> $GITHUB_OUTPUT ;;
+            arch)     echo "path=target/fin-*-arch.tar.gz" >> $GITHUB_OUTPUT ;;
+            solus)    echo "path=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT ;;
+            nix)      echo "path=target/fin-*-nix.tar.gz" >> $GITHUB_OUTPUT ;;
+          esac
+
       - name: Upload packaging artifacts
         uses: actions/upload-artifact@v4
         with:
           name: fin-package-${{ matrix.distro }}
-          path: |
-            target/debian/fin_*.deb
-            target/fin-*-rpm.tar.gz
-            target/fin-*-solus.tar.gz
-            target/fin-*-arch.tar.gz
-            target/fin-*-nix.tar.gz
+          path: ${{ steps.set-artifact-path.outputs.path }}
