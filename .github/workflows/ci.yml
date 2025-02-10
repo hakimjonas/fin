@@ -1,0 +1,160 @@
+name: CI - Multi-Distro Build & Test
+
+on:
+  push: { }
+  pull_request: { }
+  workflow_dispatch: { }
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu
+            container: ubuntu:latest
+          - distro: fedora
+            container: fedora:latest
+          - distro: arch
+            container: archlinux:latest
+          - distro: solus
+            container: hakimjonas/fin-gtk:latest
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.container }}
+      options: --entrypoint ""
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache system dependencies (apt)
+        if: matrix.distro == 'ubuntu'
+        uses: actions/cache@v3
+        with:
+          path: /var/cache/apt
+          key: ${{ runner.os }}-apt-cache-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-cache-
+
+      - name: Cache system dependencies (dnf)
+        if: matrix.distro == 'fedora'
+        uses: actions/cache@v3
+        with:
+          path: /var/cache/dnf
+          key: ${{ runner.os }}-dnf-cache-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-dnf-cache-
+
+      - name: Cache system dependencies (pacman)
+        if: matrix.distro == 'arch'
+        uses: actions/cache@v3
+        with:
+          path: /var/cache/pacman
+          key: ${{ runner.os }}-pacman-cache-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pacman-cache-
+
+      - name: Cache system dependencies (eopkg)
+        if: matrix.distro == 'solus'
+        uses: actions/cache@v3
+        with:
+          path: /var/cache/eopkg
+          key: ${{ runner.os }}-eopkg-cache-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-eopkg-cache-
+
+      - name: Cache Cargo registry and git index
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache Cargo build artifacts
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install / update system dependencies
+        run: |
+          case "${{ matrix.distro }}" in
+            ubuntu)
+              apt-get update && apt-get install -y curl libgtk-4-dev build-essential pkg-config
+              ;;
+            fedora)
+              dnf install -y curl gtk4-devel pkgconf-pkg-config gcc
+              ;;
+            arch)
+              pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
+              ;;
+            solus)
+              eopkg up -y && eopkg it -y curl libgtk-4-devel gcc
+              ;;
+            *)
+              echo "Unsupported distro: ${{ matrix.distro }}"
+              exit 1
+              ;;
+          esac
+
+      - name: Install Rust via actions-rs/toolchain
+        if: matrix.distro != 'solus'
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
+
+      - name: Install Rust manually for Solus
+        if: matrix.distro == 'solus'
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          source $HOME/.cargo/env
+          rustup default stable
+
+      - name: Install cargo-make
+        run: cargo install cargo-make
+
+      - name: Install clippy
+        run: rustup component add clippy
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Build project in release mode
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+
+      - name: Run packaging tasks
+        run: cargo make package
+
+      - name: Set artifact path
+        id: set-artifact-path
+        run: |
+          case "${{ matrix.distro }}" in
+            ubuntu)
+              echo "path=target/debian/fin_*.deb" >> $GITHUB_OUTPUT
+              ;;
+            fedora)
+              echo "path=target/fin-*-rpm.tar.gz" >> $GITHUB_OUTPUT
+              ;;
+            arch)
+              echo "path=target/fin-*-arch.tar.gz" >> $GITHUB_OUTPUT
+              ;;
+            solus)
+              echo "path=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Upload packaging artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fin-package-${{ matrix.distro }}
+          path: ${{ steps.set-artifact-path.outputs.path }}
