@@ -20,8 +20,8 @@ jobs:
           - distro: solus
             container: hakimjonas/fin-gtk:latest
           - distro: nix
-            container: nixery.dev/nix/nodejs/curl/gtk4/pkg-config/gcc:latest
-            options: --entrypoint "sh -c 'while true; do sleep 1; done'"
+            container: nixery.dev/shell/nix/nodejs/curl/gtk4/pkg-config/gcc:latest
+            options: --entrypoint "/bin/sh"
 
     runs-on: ubuntu-latest
     container:
