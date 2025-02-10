@@ -81,6 +81,30 @@ jobs:
           # Ensure Cargo's bin directory is available in subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
+      - name: Install build tools
+        run: |
+          case "${{ matrix.distro }}" in
+            ubuntu)
+              apt-get update && apt-get install -y build-essential
+              ;;
+            fedora)
+              dnf install -y gcc
+              ;;
+            arch)
+              pacman -Syu --noconfirm base-devel
+              ;;
+            solus)
+              eopkg upgrade && eopkg it -y system.devel
+              ;;
+            nix)
+              nix-channel --update && nix-env -iA nixpkgs.gcc
+              ;;
+            *)
+              echo "Unsupported distro: ${{ matrix.distro }}"
+              exit 1
+              ;;
+          esac
+
       - name: Install cargo-make
         run: cargo install cargo-make
 
