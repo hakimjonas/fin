@@ -13,35 +13,35 @@ jobs:
       RPM: ${{ secrets.RPM_PAT }}
     strategy:
       matrix:
-        distro: [ ubuntu, fedora, arch, solus, nix ]
+        include:
+          - distro: ubuntu
+            container: ubuntu:latest
+          - distro: fedora
+            container: fedora:latest
+          - distro: arch
+            container: archlinux:latest
+          - distro: solus
+            container: silkeh/solus:devel
+          - distro: nix
+            container: nixos/nix
     runs-on: ubuntu-latest
     container:
-      image: ${{ 
-        matrix.distro == 'ubuntu' && 'ubuntu:latest' ||
-        matrix.distro == 'fedora' && 'fedora:latest' ||
-        matrix.distro == 'arch' && 'archlinux:latest' ||
-        matrix.distro == 'solus' && 'silkeh/solus:devel' ||
-        matrix.distro == 'nix' && 'nixos/nix'
-        }}
+      image: ${{ matrix.container }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Rust toolchain
-        run: |
-          # Install curl first (handled in dependencies step)
-          . "$HOME/.cargo/env" 2>/dev/null || true
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-          . "$HOME/.cargo/env"
-          rustup update stable
-          rustup default stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
 
       - name: Install system dependencies
         run: |
           case "${{ matrix.distro }}" in
             ubuntu)
-              apt-get update
-              apt-get install -y curl libgtk-4-dev build-essential pkg-config
+              apt-get update && apt-get install -y curl libgtk-4-dev build-essential pkg-config
               ;;
             fedora)
               dnf install -y curl gtk4-devel pkgconf-pkg-config
@@ -50,16 +50,10 @@ jobs:
               pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
               ;;
             solus)
-              eopkg upgrade
-              eopkg it -y curl libgtk-4-devel
+              eopkg upgrade && eopkg it -y curl libgtk-4-devel
               ;;
             nix)
-              nix-channel --update
-              nix-env -iA nixpkgs.curl nixpkgs.gtk4 nixpkgs.pkg-config
-              ;;
-            *)
-              echo "Unsupported distro: ${{ matrix.distro }}"
-              exit 1
+              nix-channel --update && nix-env -iA nixpkgs.curl nixpkgs.gtk4 nixpkgs.pkg-config
               ;;
           esac
 
