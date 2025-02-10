@@ -58,14 +58,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pacman-cache-
 
-      - name: Cache system dependencies (eopkg)
-        if: matrix.distro == 'solus'
-        uses: actions/cache@v3
-        with:
-          path: /var/cache/eopkg
-          key: ${{ runner.os }}-eopkg-cache-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-eopkg-cache-
+      #      - name: Cache system dependencies (eopkg)
+      #        if: matrix.distro == 'solus'
+      #        uses: actions/cache@v3
+      #        with:
+      #          path: /var/cache/eopkg
+      #          key: ${{ runner.os }}-eopkg-cache-${{ hashFiles('**/Cargo.lock') }}
+      #          restore-keys: |
+      #            ${{ runner.os }}-eopkg-cache-
 
       - name: Cache system dependencies (nix)
         if: matrix.distro == 'nix'
@@ -102,9 +102,6 @@ jobs:
             arch)
               pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
               ;;
-            solus)
-              eopkg up && eopkg it -y curl libgtk-4-devel
-              ;;
             nix)
               nix-channel --update && \
               nix-env -iA nixpkgs.curl nixpkgs.gtk4 nixpkgs.pkg-config nixpkgs.gcc nixpkgs.nodejs
@@ -122,8 +119,11 @@ jobs:
           override: true
           profile: minimal
 
-      - name: Install cargo-make
+      - name: Install cargo-make and clippy
         run: cargo install cargo-make
+
+      - name: Install clippy
+        run: rustup component add clippy
 
       - name: Run Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
