@@ -20,7 +20,7 @@ jobs:
           - distro: solus
             container: hakimjonas/fin-gtk:latest
           - distro: nix
-            container: nixery.dev/shell/git/gcc:latest 
+            container: nixery.dev/shell/git/gcc:latest
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.container }}
@@ -101,7 +101,7 @@ jobs:
               pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
               ;;
             solus)
-              eopkg up -y
+              eopkg up -y && eopkg it -y curl gtk4-devel gcc
               ;;
             nix)
               nix-channel --update && \
