@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - release
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build_and_package:
+    # Call the reusable workflow from your repository.
+    # Note the correct syntax without "https://github.com/"
+    uses: hakimjonas/fin/.github/workflows/package-release.yml@main
+    secrets:
+      RELEASE: ${{ secrets.RELEASE }}
+
+  release:
+    needs: build_and_package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install release dependencies
+        run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev libcairo2-dev
+
+      - name: Install GitHub CLI
+        run: |
+          curl -fsSL https://cli.github.com/packages/install.sh | sh
+        continue-on-error: true
+
+      - name: Create Release using GitHub CLI
+        run: |
+          gh release create "${{ github.ref }}" \
+            --title "Release ${{ github.ref }}" \
+            --notes "Release notes go here"
+        env:
+          RELEASE: ${{ secrets.RELEASE }}
+
+      - name: Upload Release Artifacts
+        run: |
+          gh release upload "${{ github.ref }}" \
+            target/debian/fin_*.deb \
+            target/fin-*-rpm.tar.gz \
+            target/fin-*-solus.tar.gz \
+            target/fin-*-arch.tar.gz
+        env:
+          RELEASE: ${{ secrets.RELEASE }}
+
+      - name: Publish Release
+        run: gh release publish "${{ github.ref }}"
+        env:
+          RELEASE: ${{ secrets.RELEASE }}
