@@ -22,12 +22,10 @@ jobs:
           - distro: solus
             container: silkeh/solus:devel
           - distro: nix
-            # Use a container image that includes Node.js to avoid the "node not found" error.
-            container: hakimjonas/nix-node:latest
+            container: nixos/nix
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.container }}
-      # Disable any forced entrypoint so that actions can run their own commands.
       options: --entrypoint ""
     steps:
       - name: Checkout repository
@@ -47,63 +45,15 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install curl
-        run: |
-          case "${{ matrix.distro }}" in
-            ubuntu)
-              apt-get update && apt-get install -y curl
-              ;;
-            fedora)
-              dnf install -y curl
-              ;;
-            arch)
-              pacman -Syu --noconfirm curl
-              ;;
-            solus)
-              eopkg upgrade && eopkg it -y curl
-              ;;
-            nix)
-              nix-channel --update && nix-env -iA nixpkgs.curl
-              ;;
-            *)
-              echo "Unsupported distro: ${{ matrix.distro }}"
-              exit 1
-              ;;
-          esac
-
       - name: Install Rust via rustup
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          # Source Cargo's environment so rustup and cargo become available in this step
+          # Source Cargo's environment so rustup and cargo are immediately available
           . "$HOME/.cargo/env"
           rustup update stable
           rustup default stable
-          # Ensure Cargo's bin directory is available in subsequent steps
+          # Ensure Cargo's bin directory is in PATH for subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-      - name: Install build tools
-        run: |
-          case "${{ matrix.distro }}" in
-            ubuntu)
-              apt-get update && apt-get install -y build-essential
-              ;;
-            fedora)
-              dnf install -y gcc
-              ;;
-            arch)
-              pacman -Syu --noconfirm base-devel
-              ;;
-            solus)
-              eopkg upgrade && eopkg it -y system.devel
-              ;;
-            nix)
-              nix-channel --update && nix-env -iA nixpkgs.gcc
-              ;;
-            *)
-              echo "Unsupported distro: ${{ matrix.distro }}"
-              exit 1
-              ;;
-          esac
 
       - name: Install cargo-make
         run: cargo install cargo-make
@@ -112,19 +62,20 @@ jobs:
         run: |
           case "${{ matrix.distro }}" in
             ubuntu)
-              apt-get update && apt-get install -y libgtk-4-dev build-essential pkg-config
+              apt-get update && apt-get install -y curl libgtk-4-dev build-essential pkg-config
               ;;
             fedora)
-              dnf install -y gtk4-devel pkgconf-pkg-config
+              dnf install -y curl gtk4-devel pkgconf-pkg-config
               ;;
             arch)
-              pacman -Syu --noconfirm gtk4 base-devel pkgconf
+              pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
               ;;
             solus)
-              eopkg upgrade && eopkg it -y libgtk-4-devel
+              eopkg upgrade && eopkg it -y curl libgtk-4-devel
               ;;
             nix)
-              nix-channel --update && nix-env -iA nixpkgs.gtk4 nixpkgs.pkg-config
+              nix-channel --update && \
+              nix-env -iA nixpkgs.curl nixpkgs.gtk4 nixpkgs.pkg-config nixpkgs.gcc nixpkgs.nodejs
               ;;
             *)
               echo "Unsupported distro: ${{ matrix.distro }}"
