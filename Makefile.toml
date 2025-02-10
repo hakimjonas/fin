@@ -1,9 +1,11 @@
 [env]
-export = ["CARGO_MANIFEST_DIR", "PROJECT_ROOT", "ASSETS_DIR"]
+export = ["CARGO_MANIFEST_DIR", "PROJECT_ROOT", "ASSETS_DIR", "VERSION"]
 PROJECT_ROOT = "${CARGO_MAKE_WORKING_DIRECTORY}"
 ASSETS_DIR = "${PROJECT_ROOT}/assets"
 INSTALL_ASSETS_DIR = "/usr/share/fin"
 INSTALL_BIN_DIR = "/usr/local/bin"
+# Use the built-in variable provided by cargo-make
+VERSION = "${CARGO_MAKE_CRATE_VERSION}"
 
 [tasks.install-cargo-make]
 description = "Install cargo-make if not already installed"
@@ -27,9 +29,6 @@ script = [
     "echo 'Creating installation directory ${INSTALL_ASSETS_DIR}'",
     "sudo mkdir -p ${INSTALL_ASSETS_DIR}",
     "sudo chmod 755 ${INSTALL_ASSETS_DIR}",
-    "echo 'Resolved ASSETS_DIR: ${ASSETS_DIR}'",
-    "echo 'Resolved INSTALL_ASSETS_DIR: ${INSTALL_ASSETS_DIR}'",
-    "echo 'Resolved CARGO_MANIFEST_DIR: ${CARGO_MANIFEST_DIR}'",
     "echo 'Installing default configuration...'",
     "sudo cp \"${ASSETS_DIR}/config.toml\" \"${INSTALL_ASSETS_DIR}/config.toml\"",
     "echo 'Installing default stylesheet...'",
@@ -41,7 +40,7 @@ description = "Install the binary to the system binary directory"
 script = [
     "BINARY=${PROJECT_ROOT}/target/release/fin",
     "if [ ! -f \"${BINARY}\" ]; then",
-    "  echo 'Error: Binary not found at' ${BINARY} >&2",
+    "  echo 'Error: Binary not found at ${BINARY}' >&2",
     "  exit 1",
     "fi",
     "echo 'Installing binary to ${INSTALL_BIN_DIR}...'",
@@ -49,12 +48,134 @@ script = [
     "sudo chmod 755 ${INSTALL_BIN_DIR}/fin"
 ]
 
+[tasks.install-dependencies-ubuntu]
+description = "Install dependencies on Ubuntu"
+script = [
+    "sudo apt-get update",
+    "sudo apt-get install -y libgtk-4-dev"
+]
+
+[tasks.install-dependencies-fedora]
+description = "Install dependencies on Fedora"
+script = [
+    "sudo dnf install -y gtk4-devel pkgconf-pkg-config"
+]
+
+[tasks.install-dependencies-arch]
+description = "Install dependencies on Arch Linux"
+script = [
+    "sudo pacman -Syu --noconfirm gtk4 base-devel pkgconf"
+]
+
+[tasks.install-dependencies-solus]
+description = "Install dependencies on Solus"
+script = [
+    "sudo eopkg upgrade",
+    "sudo eopkg install -y libgtk-4-devel"
+]
+
+[tasks.install-dependencies]
+description = "Install dependencies based on the detected distribution"
+script = [
+    "if [ -f /etc/os-release ]; then",
+    "  . /etc/os-release",
+    "  case $ID in",
+    "    ubuntu|debian)",
+    "      cargo make install-dependencies-ubuntu",
+    "      ;;",
+    "    fedora)",
+    "      cargo make install-dependencies-fedora",
+    "      ;;",
+    "    arch)",
+    "      cargo make install-dependencies-arch",
+    "      ;;",
+    "    solus)",
+    "      cargo make install-dependencies-solus",
+    "      ;;",
+    "    *)",
+    "      echo 'Unsupported distribution: $ID' >&2",
+    "      exit 1",
+    "      ;;",
+    "  esac",
+    "else",
+    "  echo 'Cannot detect distribution' >&2",
+    "  exit 1",
+    "fi"
+]
+
 [tasks.install]
 description = "Build and install Finë (binary and assets)"
-dependencies = ["build-release", "copy-assets", "install-bin"]
+dependencies = ["install-dependencies", "build-release", "copy-assets", "install-bin"]
+
+# --- Packaging Tasks ---
+
+[tasks.package-deb]
+description = "Package Finë as a .deb using cargo-deb"
+script = [
+    "echo 'Installing cargo-deb (if needed)...'",
+    "cargo install cargo-deb --version 1.42.0 || true",
+    "echo 'Packaging .deb...'",
+    "cargo deb --no-build"
+]
+
+[tasks.package-rpm]
+description = "Package Finë as an .rpm using cargo-generate-rpm"
+dependencies = ["build-release"]
+script = [
+    "echo 'Installing cargo-generate-rpm (if needed)...'",
+    "cargo install cargo-generate-rpm --version 0.15.2 || true",
+    "echo 'Packaging .rpm...'",
+    "cargo build --release",
+    "strip -s target/release/fin",
+    "cargo generate-rpm"
+]
+
+[tasks.package-solus]
+description = "Package Finë for Solus as a tarball (including Solus manifest if available)"
+script = [
+    "echo 'Packaging for Solus...'",
+    "rm -rf target/package/solus",
+    "mkdir -p target/package/solus/usr/local/bin target/package/solus/usr/share/fin",
+    "cp target/release/fin target/package/solus/usr/local/bin/",
+    "cp -r assets target/package/solus/usr/share/fin/",
+    "if [ -f fin.sol ]; then cp fin.sol target/package/solus/; else echo 'Warning: No Solus manifest (fin.sol) found.'; fi",
+    "tar -czvf target/fin-${VERSION}-solus.tar.gz -C target/package/solus .",
+    "echo 'Solus package created: target/fin-${VERSION}-solus.tar.gz'"
+]
+
+[tasks.package-arch]
+description = "Package Finë for Arch Linux as a tarball (including PKGBUILD if available)"
+script = [
+    "echo 'Packaging for Arch...'",
+    "rm -rf target/package/arch",
+    "mkdir -p target/package/arch/fin",
+    "cp target/release/fin target/package/arch/fin/",
+    "cp -r assets target/package/arch/fin/",
+    "if [ -f PKGBUILD ]; then cp PKGBUILD target/package/arch/fin/; else echo 'Warning: No PKGBUILD file found.'; fi",
+    "tar -czvf target/fin-${VERSION}-arch.tar.gz -C target/package/arch fin",
+    "echo 'Arch package created: target/fin-${VERSION}-arch.tar.gz'"
+]
+
+[tasks.package-nix]
+description = "Package Finë for Nix as a tarball (including default.nix if available)"
+script = [
+    "echo 'Packaging for Nix...'",
+    "rm -rf target/package/nix",
+    "mkdir -p target/package/nix/fin",
+    "cp target/release/fin target/package/nix/fin/",
+    "cp -r assets target/package/nix/fin/",
+    "if [ -f default.nix ]; then cp default.nix target/package/nix/fin/; else echo 'Warning: No default.nix file found.'; fi",
+    "tar -czvf target/fin-${VERSION}-nix.tar.gz -C target/package/nix fin",
+    "echo 'Nix package created: target/fin-${VERSION}-nix.tar.gz'"
+]
 
 [tasks.package]
-description = "Package the application (placeholder task)"
-script = [
-    "echo 'Packaging is not fully implemented yet.'"
+description = "Package Finë for distribution (.deb, .rpm, Solus, Arch, and Nix)"
+dependencies = [
+    "build-release",
+    "package-deb",
+    "package-rpm",
+    "package-solus",
+    "package-arch",
+    "package-nix"
 ]
