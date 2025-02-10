@@ -20,8 +20,8 @@ jobs:
           - distro: solus
             container: silkeh/solus:devel
           - distro: nix
-            container: nixery.dev/nix/nodejs/curl/gtk4/pkg-config/gcc
-
+            container: nixery.dev/nix/nodejs/curl/gtk4/pkg-config/gcc:latest
+            options: --entrypoint "sh"
 
     runs-on: ubuntu-latest
     container:
@@ -37,6 +37,8 @@ jobs:
         with:
           path: /var/cache/apt
           key: ${{ runner.os }}-apt-cache-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-cache-
 
       - name: Cache system dependencies (dnf)
         if: matrix.distro == 'fedora'
@@ -44,6 +46,8 @@ jobs:
         with:
           path: /var/cache/dnf
           key: ${{ runner.os }}-dnf-cache-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-dnf-cache-
 
       - name: Cache system dependencies (pacman)
         if: matrix.distro == 'arch'
@@ -51,6 +55,8 @@ jobs:
         with:
           path: /var/cache/pacman
           key: ${{ runner.os }}-pacman-cache-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pacman-cache-
 
       - name: Cache system dependencies (eopkg)
         if: matrix.distro == 'solus'
@@ -58,6 +64,8 @@ jobs:
         with:
           path: /var/cache/eopkg
           key: ${{ runner.os }}-eopkg-cache-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-eopkg-cache-
 
       - name: Cache system dependencies (nix)
         if: matrix.distro == 'nix'
@@ -65,6 +73,8 @@ jobs:
         with:
           path: /nix/store
           key: ${{ runner.os }}-nix-store-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nix-store-
 
       - name: Cache Cargo registry and git index
         uses: actions/cache@v3
@@ -105,28 +115,32 @@ jobs:
               ;;
           esac
 
-      - name: Install Rust via rustup
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          # Source Cargo's environment so rustup and cargo are immediately available
-          . "$HOME/.cargo/env"
-          rustup update stable
-          rustup default stable
-          # Ensure Cargo's bin directory is in PATH for subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - name: Install Rust via actions-rs/toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
 
       - name: Install cargo-make
         run: cargo install cargo-make
 
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
       - name: Build project in release mode
-        run: |
-          if [ "${{ matrix.distro }}" = "nix" ]; then export CC=gcc; fi
-          cargo build --release
+        uses: actions-rs/cargo@v1
+        with:
+          command: build --release
+        env:
+          CC: ${{ matrix.distro == 'nix' && 'gcc' || '' }}
 
       - name: Run tests
-        run: |
-          if [ "${{ matrix.distro }}" = "nix" ]; then export CC=gcc; fi
-          cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+        env:
+          CC: ${{ matrix.distro == 'nix' && 'gcc' || '' }}
 
       - name: Run packaging tasks
         run: |
