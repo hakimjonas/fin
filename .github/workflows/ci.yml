@@ -2,9 +2,9 @@ name: CI - Multi-Distro Build & Test
 
 on:
   push:
-    branches: [ automations ]
+    branches: [automations]
   pull_request:
-    branches: [ automations ]
+    branches: [automations]
   workflow_dispatch:
 
 jobs:
@@ -55,6 +55,10 @@ jobs:
             nix)
               nix-channel --update && nix-env -iA nixpkgs.curl nixpkgs.gtk4 nixpkgs.pkg-config
               ;;
+            *)
+              echo "Unsupported distro: ${{ matrix.distro }}"
+              exit 1
+              ;;
           esac
 
       - name: Build project in release mode
@@ -70,11 +74,21 @@ jobs:
         id: set-artifact-path
         run: |
           case "${{ matrix.distro }}" in
-            ubuntu)   echo "path=target/debian/fin_*.deb" >> $GITHUB_OUTPUT ;;
-            fedora)   echo "path=target/fin-*-rpm.tar.gz" >> $GITHUB_OUTPUT ;;
-            arch)     echo "path=target/fin-*-arch.tar.gz" >> $GITHUB_OUTPUT ;;
-            solus)    echo "path=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT ;;
-            nix)      echo "path=target/fin-*-nix.tar.gz" >> $GITHUB_OUTPUT ;;
+            ubuntu)
+              echo "path=target/debian/fin_*.deb" >> $GITHUB_OUTPUT
+              ;;
+            fedora)
+              echo "path=target/fin-*-rpm.tar.gz" >> $GITHUB_OUTPUT
+              ;;
+            arch)
+              echo "path=target/fin-*-arch.tar.gz" >> $GITHUB_OUTPUT
+              ;;
+            solus)
+              echo "path=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT
+              ;;
+            nix)
+              echo "path=target/fin-*-nix.tar.gz" >> $GITHUB_OUTPUT
+              ;;
           esac
 
       - name: Upload packaging artifacts
