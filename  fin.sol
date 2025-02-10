@@ -9,9 +9,7 @@
   <License>MIT</License>
   <Group>Utility</Group>
   <URL>https://github.com/hakimjonas/fin</URL>
-  <!-- Optionally, specify an Icon path if you have one (absolute path is recommended) -->
   <Icon>/usr/share/icons/fin.png</Icon>
-  <!-- Runtime dependency: adjust if Solus uses a different package name for gtk4 -->
   <Depends>gtk4</Depends>
   <Install>
     <Copy from="target/release/fin" to="/usr/local/bin/fin" mode="755" />
