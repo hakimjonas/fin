@@ -99,18 +99,19 @@ jobs:
           esac
 
       - name: Install Rust via actions-rs/toolchain
+        if: matrix.distro != 'solus'
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
           profile: minimal
 
-      - name: Ensure rustup is installed
+      - name: Install Rust manually for Solus
+        if: matrix.distro == 'solus'
         run: |
-          if ! command -v rustup &> /dev/null; then
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-            source $HOME/.cargo/env
-          fi
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          source $HOME/.cargo/env
+          rustup default stable
 
       - name: Install cargo-make
         run: cargo install cargo-make
