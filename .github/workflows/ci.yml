@@ -1,12 +1,8 @@
 name: CI - Multi-Distro Build & Test
 
 on:
-  push:
-    branches:
-      - automations
-  pull_request:
-    branches:
-      - automations
+  push: { }
+  pull_request: { }
   workflow_dispatch: { }
 
 jobs:
@@ -14,6 +10,7 @@ jobs:
     env:
       RPM: ${{ secrets.RPM_PAT }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - distro: ubuntu
@@ -25,13 +22,30 @@ jobs:
           - distro: solus
             container: silkeh/solus:devel
           - distro: nix
-            container: nixos/nix
+            # Use a container image that includes Node.js to avoid the "node not found" error.
+            container: hakimjonas/nix-node:latest
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.container }}
+      # Disable any forced entrypoint so that actions can run their own commands.
+      options: --entrypoint ""
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - name: Cache Cargo registry and git index
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache Cargo build artifacts
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install curl
         run: |
@@ -60,7 +74,7 @@ jobs:
       - name: Install Rust via rustup
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          # Source Cargo's environment so that rustup is available immediately
+          # Immediately source Cargo's env so rustup and cargo are available
           . "$HOME/.cargo/env"
           rustup update stable
           rustup default stable
@@ -96,3 +110,33 @@ jobs:
 
       - name: Run tests
         run: cargo test
+
+      - name: Run packaging tasks
+        run: cargo make package
+
+      - name: Set artifact path
+        id: set-artifact-path
+        run: |
+          case "${{ matrix.distro }}" in
+            ubuntu)
+              echo "path=target/debian/fin_*.deb" >> $GITHUB_OUTPUT
+              ;;
+            fedora)
+              echo "path=target/fin-*-rpm.tar.gz" >> $GITHUB_OUTPUT
+              ;;
+            arch)
+              echo "path=target/fin-*-arch.tar.gz" >> $GITHUB_OUTPUT
+              ;;
+            solus)
+              echo "path=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT
+              ;;
+            nix)
+              echo "path=target/fin-*-nix.tar.gz" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Upload packaging artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fin-package-${{ matrix.distro }}
+          path: ${{ steps.set-artifact-path.outputs.path }}
