@@ -10,7 +10,7 @@ jobs:
   build_and_package:
     # Call the reusable workflow from your repository.
     # Note the correct syntax without "https://github.com/"
-    uses: hakimjonas/fin/.github/workflows/package-release.yml@main
+    uses: hakimjonas/fin/.github/workflows/package-release.yml@trunk
     secrets:
       RELEASE: ${{ secrets.RELEASE }}
 
