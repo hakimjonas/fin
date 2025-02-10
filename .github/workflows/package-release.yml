@@ -13,6 +13,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev pkg-config
+
       - name: Set up Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -29,7 +32,6 @@ jobs:
       - name: Set artifact paths
         id: set-artifact-path
         run: |
-          # Set outputs for all artifact patterns.
           echo "debian=target/debian/fin_*.deb" >> $GITHUB_OUTPUT
           echo "rpm=target/fin-*-rpm.tar.gz" >> $GITHUB_OUTPUT
           echo "solus=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT
