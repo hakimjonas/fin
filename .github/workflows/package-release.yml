@@ -52,17 +52,12 @@ jobs:
       - name: Run packaging tasks
         run: cargo make package
 
-      # (Optional) Debug: List files to check where RPM is generated
-      - name: List RPM output files
-        run: find target -type f | grep -i rpm
-
       # 10. Set artifact paths for all four distributions
       - name: Set artifact paths
         id: set-artifact-path
         run: |
           echo "debian=target/debian/fin_*.deb" >> $GITHUB_OUTPUT
-          # Adjusted RPM pattern to match the expected output from cargo-generate-rpm.
-          echo "rpm=target/rpm/fin*.rpm" >> $GITHUB_OUTPUT
+          echo "rpm=target/generate-rpm/fin*.rpm" >> $GITHUB_OUTPUT
           echo "solus=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT
           echo "arch=target/fin-*-arch.tar.gz" >> $GITHUB_OUTPUT
 
