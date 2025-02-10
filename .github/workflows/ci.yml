@@ -31,6 +31,42 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Cache system dependencies
+        if: matrix.distro == 'ubuntu'
+        uses: actions/cache@v3
+        with:
+          path: /var/cache/apt
+          key: ${{ runner.os }}-apt-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache system dependencies
+        if: matrix.distro == 'fedora'
+        uses: actions/cache@v3
+        with:
+          path: /var/cache/dnf
+          key: ${{ runner.os }}-dnf-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache system dependencies
+        if: matrix.distro == 'arch'
+        uses: actions/cache@v3
+        with:
+          path: /var/cache/pacman
+          key: ${{ runner.os }}-pacman-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache system dependencies
+        if: matrix.distro == 'solus'
+        uses: actions/cache@v3
+        with:
+          path: /var/cache/eopkg
+          key: ${{ runner.os }}-eopkg-cache-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache system dependencies
+        if: matrix.distro == 'nix'
+        uses: actions/cache@v3
+        with:
+          path: /nix/store
+          key: ${{ runner.os }}-nix-store-${{ hashFiles('**/Cargo.lock') }}
+
+
       - name: Cache Cargo registry and git index
         uses: actions/cache@v3
         with:
@@ -45,18 +81,6 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install Rust via rustup
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          # Source Cargo's environment so rustup and cargo are immediately available
-          . "$HOME/.cargo/env"
-          rustup update stable
-          rustup default stable
-          # Ensure Cargo's bin directory is in PATH for subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-      - name: Install cargo-make
-        run: cargo install cargo-make
 
       - name: Install system dependencies
         run: |
@@ -81,7 +105,20 @@ jobs:
               echo "Unsupported distro: ${{ matrix.distro }}"
               exit 1
               ;;
-          esac
+          esac    
+
+      - name: Install Rust via rustup
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          # Source Cargo's environment so rustup and cargo are immediately available
+          . "$HOME/.cargo/env"
+          rustup update stable
+          rustup default stable
+          # Ensure Cargo's bin directory is in PATH for subsequent steps
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install cargo-make
+        run: cargo install cargo-make
 
       - name: Build project in release mode
         run: cargo build --release
