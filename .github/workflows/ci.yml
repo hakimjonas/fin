@@ -66,7 +66,6 @@ jobs:
           path: /nix/store
           key: ${{ runner.os }}-nix-store-${{ hashFiles('**/Cargo.lock') }}
 
-
       - name: Cache Cargo registry and git index
         uses: actions/cache@v3
         with:
@@ -81,7 +80,6 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
 
-
       - name: Install system dependencies
         run: |
           case "${{ matrix.distro }}" in
@@ -89,7 +87,7 @@ jobs:
               apt-get update && apt-get install -y curl libgtk-4-dev build-essential pkg-config
               ;;
             fedora)
-              dnf install -y curl gtk4-devel pkgconf-pkg-config
+              dnf install -y curl gtk4-devel pkgconf-pkg-config gcc
               ;;
             arch)
               pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
@@ -121,13 +119,19 @@ jobs:
         run: cargo install cargo-make
 
       - name: Build project in release mode
-        run: cargo build --release
+        run: |
+          if [ "${{ matrix.distro }}" = "nix" ]; then export CC=gcc; fi
+          cargo build --release
 
       - name: Run tests
-        run: cargo test
+        run: |
+          if [ "${{ matrix.distro }}" = "nix" ]; then export CC=gcc; fi
+          cargo test
 
       - name: Run packaging tasks
-        run: cargo make package
+        run: |
+          if [ "${{ matrix.distro }}" = "nix" ]; then export CC=gcc; fi
+          cargo make package
 
       - name: Set artifact path
         id: set-artifact-path
