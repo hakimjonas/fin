@@ -31,22 +31,22 @@ jobs:
       image: ${{ matrix.container }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Install curl
         run: |
           case "${{ matrix.distro }}" in
             ubuntu)
-              apt-get update && apt-get install -y curl
+              sudo apt-get update && sudo apt-get install -y curl
               ;;
             fedora)
-              dnf install -y curl
+              sudo dnf install -y curl
               ;;
             arch)
-              pacman -Syu --noconfirm curl
+              sudo pacman -Syu --noconfirm curl
               ;;
             solus)
-              eopkg upgrade && eopkg it -y curl
+              sudo eopkg upgrade && sudo eopkg it -y curl
               ;;
             nix)
               nix-channel --update && nix-env -iA nixpkgs.curl
@@ -60,7 +60,7 @@ jobs:
       - name: Install Rust via rustup
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          # Ensure Cargo’s bin directory is available in subsequent steps
+          # Make Cargo's bin directory available in subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           rustup update stable
           rustup default stable
@@ -69,19 +69,19 @@ jobs:
         run: |
           case "${{ matrix.distro }}" in
             ubuntu)
-              apt-get update && apt-get install -y curl libgtk-4-dev build-essential pkg-config
+              sudo apt-get update && sudo apt-get install -y libgtk-4-dev build-essential pkg-config
               ;;
             fedora)
-              dnf install -y curl gtk4-devel pkgconf-pkg-config
+              sudo dnf install -y gtk4-devel pkgconf-pkg-config
               ;;
             arch)
-              pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
+              sudo pacman -Syu --noconfirm gtk4 base-devel pkgconf
               ;;
             solus)
-              eopkg upgrade && eopkg it -y curl libgtk-4-devel
+              sudo eopkg upgrade && sudo eopkg it -y libgtk-4-devel
               ;;
             nix)
-              nix-channel --update && nix-env -iA nixpkgs.curl nixpkgs.gtk4 nixpkgs.pkg-config
+              nix-channel --update && nix-env -iA nixpkgs.gtk4 nixpkgs.pkg-config
               ;;
             *)
               echo "Unsupported distro: ${{ matrix.distro }}"
@@ -94,33 +94,3 @@ jobs:
 
       - name: Run tests
         run: cargo test
-
-      - name: Run packaging tasks
-        run: cargo make package
-
-      - name: Set artifact path
-        id: set-artifact-path
-        run: |
-          case "${{ matrix.distro }}" in
-            ubuntu)
-              echo "path=target/debian/fin_*.deb" >> $GITHUB_OUTPUT
-              ;;
-            fedora)
-              echo "path=target/fin-*-rpm.tar.gz" >> $GITHUB_OUTPUT
-              ;;
-            arch)
-              echo "path=target/fin-*-arch.tar.gz" >> $GITHUB_OUTPUT
-              ;;
-            solus)
-              echo "path=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT
-              ;;
-            nix)
-              echo "path=target/fin-*-nix.tar.gz" >> $GITHUB_OUTPUT
-              ;;
-          esac
-
-      - name: Upload packaging artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: fin-package-${{ matrix.distro }}
-          path: ${{ steps.set-artifact-path.outputs.path }}
