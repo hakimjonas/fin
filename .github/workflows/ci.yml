@@ -33,11 +33,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+      - name: Install Rust via rustup
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          # Update the PATH for subsequent steps
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          rustup update stable
+          rustup default stable
 
       - name: Install system dependencies
         run: |
