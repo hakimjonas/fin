@@ -58,14 +58,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pacman-cache-
 
-      #      - name: Cache system dependencies (eopkg)
-      #        if: matrix.distro == 'solus'
-      #        uses: actions/cache@v3
-      #        with:
-      #          path: /var/cache/eopkg
-      #          key: ${{ runner.os }}-eopkg-cache-${{ hashFiles('**/Cargo.lock') }}
-      #          restore-keys: |
-      #            ${{ runner.os }}-eopkg-cache-
+      - name: Cache system dependencies (eopkg)
+        if: matrix.distro == 'solus'
+        uses: actions/cache@v3
+        with:
+          path: /var/cache/eopkg
+          key: ${{ runner.os }}-eopkg-cache-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-eopkg-cache-
 
       - name: Cache system dependencies (nix)
         if: matrix.distro == 'nix'
@@ -90,7 +90,7 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install system dependencies
+      - name: Install / update system dependencies
         run: |
           case "${{ matrix.distro }}" in
             ubuntu)
@@ -101,6 +101,9 @@ jobs:
               ;;
             arch)
               pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
+              ;;
+            solus)
+              eopkg up -y
               ;;
             nix)
               nix-channel --update && \
@@ -131,7 +134,7 @@ jobs:
       - name: Build project in release mode
         uses: actions-rs/cargo@v1
         with:
-          command: build --release
+          command: build
         env:
           CC: ${{ matrix.distro == 'nix' && 'gcc' || '' }}
 
