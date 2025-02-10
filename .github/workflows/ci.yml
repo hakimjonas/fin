@@ -20,7 +20,8 @@ jobs:
           - distro: solus
             container: silkeh/solus:devel
           - distro: nix
-            container: nixos/nix
+            container: ghcr.io/jyn514/nix-node:latest
+
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.container }}
@@ -91,7 +92,7 @@ jobs:
               pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
               ;;
             solus)
-              eopkg upgrade && eopkg it -y curl libgtk-4-devel
+              eopkg up && eopkg it -y curl libgtk-4-devel
               ;;
             nix)
               nix-channel --update && \
