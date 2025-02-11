@@ -9,8 +9,6 @@ on:
 jobs:
   build_and_package:
     uses: ./.github/workflows/ci.yml
-    secrets:
-      RELEASE: ${{ secrets.RELEASE }}
 
   release:
     needs: build_and_package
