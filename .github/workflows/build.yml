@@ -15,17 +15,25 @@ jobs:
       matrix:
         include:
           - distro: ubuntu
+            package_task: deb
             container: ubuntu:latest
             artifact_path: target/debian/*.deb
           - distro: fedora
+            package_task: rpm
             container: fedora:latest
-            artifact_path: target/rpm/*.rpm
+            artifact_path: target/release/rpmbuild/RPMS/*/*.rpm
           - distro: arch
+            package_task: arch
             container: archlinux:latest
             artifact_path: target/*-arch.tar.gz
           - distro: solus
+            package_task: solus
             container: hakimjonas/fin-gtk:latest
             artifact_path: target/*-solus.tar.gz
+          - distro: nix
+            package_task: nix
+            container: ubuntu:latest
+            artifact_path: target/*-nix.tar.gz
 
     runs-on: ubuntu-latest
     container:
@@ -52,7 +60,7 @@ jobs:
               apt-get update && apt-get install -y curl libgtk-4-dev build-essential pkg-config
               ;;
             fedora)
-              dnf install -y curl gtk4-devel pkgconf-pkg-config gcc
+              dnf install -y curl gtk4-devel pkgconf-pkg-config gcc rpm-build rpmdevtools
               ;;
             arch)
               pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
@@ -60,6 +68,9 @@ jobs:
             solus)
               eopkg up -y
               eopkg it -y curl libgtk-4-devel gcc
+              ;;
+            nix)
+              apt-get update && apt-get install -y curl  # Base dependencies
               ;;
           esac
 
@@ -75,8 +86,17 @@ jobs:
       - name: Run tests
         run: cargo test
 
+      - name: Prepare Build Directories
+        if: matrix.distro == 'fedora'
+        run: mkdir -p target/release/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+
       - name: Package
-        run: cargo make package
+        run: cargo make package-${{ matrix.package_task }}
+
+      - name: Verify artifacts
+        run: |
+          echo "Artifact path: ${{ matrix.artifact_path }}"
+          ls -la $(dirname "${{ matrix.artifact_path }}") || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
