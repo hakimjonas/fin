@@ -18,10 +18,6 @@ jobs:
             package_task: deb
             container: ubuntu:latest
             artifact_path: target/debian/*.deb
-          - distro: fedora
-            package_task: rpm
-            container: fedora:latest
-            artifact_path: target/rpmbuild/RPMS/**/*.rpm
           - distro: arch
             package_task: arch
             container: archlinux:latest
@@ -59,9 +55,6 @@ jobs:
             ubuntu)
               apt-get update && apt-get install -y curl libgtk-4-dev build-essential pkg-config
               ;;
-            fedora)
-              dnf install -y curl gtk4-devel pkgconf-pkg-config gcc rpm-build rpmdevtools
-              ;;
             arch)
               pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
               ;;
@@ -70,7 +63,7 @@ jobs:
               eopkg it -y curl libgtk-4-devel gcc
               ;;
             nix)
-              apt-get update && apt-get install -y curl      build-essential pkg-config libglib2.0-dev libgtk-4-dev           
+              apt-get update && apt-get install -y curl build-essential pkg-config libglib2.0-dev libgtk-4-dev
               ;;
           esac
 
@@ -80,21 +73,11 @@ jobs:
       - name: Install cargo-make
         run: cargo install cargo-make
 
-      - name: Clean cargo cache
-        if: matrix.distro == 'fedora'
-        run: |
-          cargo clean
-          rm -rf ~/.cargo/registry/index/*
-
       - name: Build project
         run: cargo build --release
 
       - name: Run tests
         run: cargo test
-
-      - name: Prepare Build Directories
-        if: matrix.distro == 'fedora'
-        run: mkdir -p target/release/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
       - name: Package
         run: cargo make package-${{ matrix.package_task }}
@@ -103,12 +86,6 @@ jobs:
         run: |
           echo "Artifact path: ${{ matrix.artifact_path }}"
           ls -la $(dirname "${{ matrix.artifact_path }}") || true
-          if [ "${{ matrix.distro }}" == "fedora" ]; then
-            echo "RPM build tree:"
-            tree target/rpmbuild || true
-            echo "Looking for RPMs:"
-            find target/rpmbuild -name '*.rpm' || echo "No RPMs found"
-          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
