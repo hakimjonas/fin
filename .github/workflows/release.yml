@@ -21,11 +21,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  
+          fetch-depth: 0 
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
+          name: build-artifacts  
           path: artifacts/
 
       - name: Extract tag from GITHUB_REF
@@ -34,18 +35,36 @@ jobs:
           tag=$(echo "${GITHUB_REF}" | sed 's/^refs\/tags\///')
           echo "tag=$tag" >> $GITHUB_ENV
 
-      - name: Create Release using GitHub CLI
+      - name: Ensure Artifacts Are Present
         run: |
-          cd $GITHUB_WORKSPACE  
-          gh release create "$tag" \
-            --title "Release $tag" \
-            --notes "Release notes go here"
+          ls -lah artifacts/
+          if [ -z "$(ls -A artifacts/)" ]; then
+            echo "❌ No artifacts found. Exiting."
+            exit 1
+          fi
+
+      - name: Create or Update Release using GitHub CLI
+        run: |
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "🔄 Release already exists. Updating..."
+            gh release edit "$tag" \
+              --title "Release $tag" \
+              --notes "Updated release notes"
+          else
+            echo "🚀 Creating new release..."
+            gh release create "$tag" \
+              --title "Release $tag" \
+              --notes "Release notes go here"
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Release Artifacts using GitHub CLI
         run: |
-          gh release upload "$tag" artifacts/build-artifacts/*
+          for file in artifacts/*; do
+            echo "⬆ Uploading $file..."
+            gh release upload "$tag" "$file"
+          done
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
