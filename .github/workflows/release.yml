@@ -45,10 +45,10 @@ jobs:
       # Move artifacts to workspace root
       - name: Prepare artifacts for release upload
         run: |
-          mv fin-package-debian/*.deb .
-          mv fin-package-rpm/*.rpm .
-          mv fin-package-solus/*.tar.gz .
-          mv fin-package-arch/*.tar.gz .
+          mv fin-package-debian/*.zip .
+          mv fin-package-rpm/*.zip .
+          mv fin-package-solus/*.zip .
+          mv fin-package-arch/*.zip .
 
       # Extract tag
       - name: Extract tag from GITHUB_REF

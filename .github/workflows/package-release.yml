@@ -55,22 +55,22 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fin-package-debian
-          path: artifacts/fin_*.deb
+          path: artifacts/fin-package-debian.zip
 
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
           name: fin-package-rpm
-          path: artifacts/fin*.rpm
+          path: artifacts/fin-package-rpm.zip
 
       - name: Upload Solus artifact
         uses: actions/upload-artifact@v4
         with:
           name: fin-package-solus
-          path: artifacts/fin-*-solus.tar.gz
+          path: artifacts/fin-package-solus.zip
 
       - name: Upload Arch artifact
         uses: actions/upload-artifact@v4
         with:
           name: fin-package-arch
-          path: artifacts/fin-*-arch.tar.gz
+          path: artifacts/fin-package-arch.zip
