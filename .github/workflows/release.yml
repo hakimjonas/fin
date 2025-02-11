@@ -45,7 +45,7 @@ jobs:
 
       - name: Upload Release Artifacts using GitHub CLI
         run: |
-          gh release upload "$tag" artifacts/*
+          gh release upload "$tag" artifacts/build-artifacts/*
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
