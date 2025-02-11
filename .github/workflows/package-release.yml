@@ -12,29 +12,29 @@ jobs:
     env:
       PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig
     steps:
-      # 1. Checkout code (same as in CI)
+      # 1. Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Install system dependencies in the correct order (including RPM build tools)
+      # 2. Install system dependencies (including rpm build tools)
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y curl libgtk-4-dev build-essential pkg-config rpm
 
-      # 3. Set PKG_CONFIG_PATH so that pkg-config can locate glib-2.0.pc
-      - name: Set PKG_CONFIG_PATH
-        run: echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
+      # 3. Set PKG_CONFIG_PATH (already set via env, but we echo to confirm)
+      - name: Confirm PKG_CONFIG_PATH
+        run: echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
 
-      # 4. Set up Rust toolchain (using rustup already on the runner)
+      # 4. Set up Rust toolchain (rustup is on the runner)
       - name: Set up Rust toolchain
         run: rustup default stable
 
-      # 5. Install cargo-make (needed for packaging tasks)
+      # 5. Install cargo-make
       - name: Install cargo-make
         run: cargo install cargo-make
 
-      # 6. Install clippy and run it
+      # 6. Install and run clippy
       - name: Install clippy
         run: rustup component add clippy
       - name: Run Clippy
@@ -48,27 +48,31 @@ jobs:
       - name: Run tests
         run: cargo test
 
-      # 9. Run packaging tasks
+      # 9. Run packaging tasks (cargo make package)
       - name: Run packaging tasks
         run: cargo make package
 
-      # 9.5 Sanitize RPM filename (remove invalid characters)
+      # 9.5 Rename the RPM file to remove invalid characters (e.g., the question mark)
       - name: Sanitize RPM filename
         run: |
           for f in target/generate-rpm/fin*.rpm; do
-            newf=$(echo "$f" | sed 's/%{?dist}//g');
-            echo "Renaming $f to $newf";
-            mv "$f" "$newf";
+            newf=$(echo "$f" | sed 's/%{?dist}//g')
+            if [ "$f" != "$newf" ]; then
+              echo "Renaming $f to $newf"
+              mv "$f" "$newf"
+            fi
           done
 
-      # 10. Set artifact paths for all four distributions
+      # 10. Capture artifact paths
       - name: Set artifact paths
         id: set-artifact-path
         run: |
           echo "debian=target/debian/fin_*.deb" >> $GITHUB_OUTPUT
-          echo "rpm=target/generate-rpm/fin*.rpm" >> $GITHUB_OUTPUT
+          rpm_file=$(find target/generate-rpm -maxdepth 1 -type f -name "fin*.rpm" | head -n 1)
+          echo "rpm=$rpm_file" >> $GITHUB_OUTPUT
           echo "solus=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT
           echo "arch=target/fin-*-arch.tar.gz" >> $GITHUB_OUTPUT
+          echo "RPM file is: $rpm_file"  # Debug information
 
       # 11. Upload artifacts
       - name: Upload Debian artifact
