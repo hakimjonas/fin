@@ -82,7 +82,7 @@ jobs:
         run: |
           case "${{ matrix.distro }}" in
             ubuntu) echo "path=target/debian/fin_*.deb" >> $GITHUB_OUTPUT ;;
-            fedora) echo "path=target/fin-*-rpm.tar.gz" >> $GITHUB_OUTPUT ;;
+            fedora) echo "path=target/fin-*.rpm" >> $GITHUB_OUTPUT ;;
             arch) echo "path=target/fin-*-arch.tar.gz" >> $GITHUB_OUTPUT ;;
             solus) echo "path=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT ;;
           esac
