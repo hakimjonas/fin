@@ -8,8 +8,6 @@ on:
 
 jobs:
   build_and_package:
-    # Call the reusable workflow from your repository.
-    # Note: using your default branch "trunk" here.
     uses: hakimjonas/fin/.github/workflows/package-release.yml@trunk
     secrets:
       RELEASE: ${{ secrets.RELEASE }}
@@ -18,12 +16,12 @@ jobs:
     needs: build_and_package
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Ensure the job has write permission to create releases.
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Download artifacts that were uploaded in the build_and_package job.
+      # Download artifacts
       - name: Download Debian Artifact
         uses: actions/download-artifact@v4
         with:
@@ -44,34 +42,22 @@ jobs:
         with:
           name: fin-package-arch
 
-      # Flatten downloaded artifact directories so that the files are at the workspace root.
+      # Move artifacts to workspace root
       - name: Prepare artifacts for release upload
         run: |
-          # For Solus, the file was uploaded from "target/fin-*-solus.tar.gz"
-          # It will be extracted under a directory named "fin-package-solus".
-          # Move it to the workspace root.
-          find fin-package-solus -name "fin-*-solus.tar.gz" -exec mv {} . \;
-          # Do the same for the Arch artifact.
-          find fin-package-arch -name "fin-*-arch.tar.gz" -exec mv {} . \;
-          # (Optionally, flatten Debian and RPM if they are nested)
-          find fin-package-debian -name "fin_*.deb" -exec mv {} . \;
-          find fin-package-rpm -name "fin*.rpm" -exec mv {} . \;
+          mv fin-package-debian/*.deb .
+          mv fin-package-rpm/*.rpm .
+          mv fin-package-solus/*.tar.gz .
+          mv fin-package-arch/*.tar.gz .
 
-      - name: Install release dependencies
-        run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev libcairo2-dev
-
-      - name: Install GitHub CLI
-        run: |
-          curl -fsSL https://cli.github.com/packages/install.sh | sh
-        continue-on-error: true
-
-      # Extract the tag name from GITHUB_REF (e.g., "refs/tags/v1.0.0" becomes "v1.0.0")
+      # Extract tag
       - name: Extract tag from GITHUB_REF
         id: extract-tag
         run: |
           tag=$(echo "${GITHUB_REF}" | sed 's/^refs\/tags\///')
           echo "tag=$tag" >> $GITHUB_OUTPUT
 
+      # Create and upload release
       - name: Create Release using GitHub CLI
         run: |
           gh release create "${{ steps.extract-tag.outputs.tag }}" \

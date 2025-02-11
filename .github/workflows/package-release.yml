@@ -16,68 +16,61 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Install system dependencies (including rpm build tools)
+      # 2. Install system dependencies
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y curl libgtk-4-dev build-essential pkg-config rpm
 
-      # 3. Confirm PKG_CONFIG_PATH
-      - name: Confirm PKG_CONFIG_PATH
-        run: echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
-
-      # 4. Set up Rust toolchain
+      # 3. Set up Rust toolchain
       - name: Set up Rust toolchain
         run: rustup default stable
 
-      # 5. Install cargo-make
+      # 4. Install cargo-make
       - name: Install cargo-make
         run: cargo install cargo-make
 
-      # 8. Build project in release mode
+      # 5. Build and test
       - name: Build project in release mode
         run: cargo build --release
 
-      # 9. Run tests
       - name: Run tests
         run: cargo test
 
-      # 10. Run packaging tasks (this will run your cargo-make package task)
+      # 6. Run packaging tasks
       - name: Run packaging tasks
         run: cargo make package
 
-      # 11. Capture artifact paths
-      - name: Set artifact paths
-        id: set-artifact-path
+      # 7. Prepare artifacts in a flat directory
+      - name: Prepare artifacts for upload
         run: |
-          echo "debian=target/debian/fin_*.deb" >> $GITHUB_OUTPUT
-          rpm_file=$(find target/generate-rpm -maxdepth 1 -type f -name "fin*.rpm" | head -n 1)
-          echo "rpm=$rpm_file" >> $GITHUB_OUTPUT
-          echo "solus=target/fin-*-solus.zip" >> $GITHUB_OUTPUT
-          echo "arch=target/fin-*-arch.zip" >> $GITHUB_OUTPUT
-          echo "RPM file is: $rpm_file"  # Debug information
+          mkdir -p artifacts
+          cp target/debian/fin_*.deb artifacts/
+          cp target/generate-rpm/fin*.rpm artifacts/
+          cp target/fin-*-solus.tar.gz artifacts/
+          cp target/fin-*-arch.tar.gz artifacts/
 
-      # 12. Upload artifacts
+      # 8. Upload artifacts
       - name: Upload Debian artifact
         uses: actions/upload-artifact@v4
         with:
           name: fin-package-debian
-          path: ${{ steps.set-artifact-path.outputs.debian }}
+          path: artifacts/fin_*.deb
 
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
           name: fin-package-rpm
-          path: ${{ steps.set-artifact-path.outputs.rpm }}
+          path: artifacts/fin*.rpm
 
       - name: Upload Solus artifact
         uses: actions/upload-artifact@v4
         with:
           name: fin-package-solus
-          path: ${{ steps.set-artifact-path.outputs.solus }}
+          path: artifacts/fin-*-solus.tar.gz
 
       - name: Upload Arch artifact
         uses: actions/upload-artifact@v4
         with:
           name: fin-package-arch
-          path: ${{ steps.set-artifact-path.outputs.arch }}
+          path: artifacts/fin-*-arch.tar.gz
