@@ -44,6 +44,19 @@ jobs:
         with:
           name: fin-package-arch
 
+      # Flatten downloaded artifact directories so that the files are at the workspace root.
+      - name: Prepare artifacts for release upload
+        run: |
+          # For Solus, the file was uploaded from "target/fin-*-solus.tar.gz"
+          # It will be extracted under a directory named "fin-package-solus".
+          # Move it to the workspace root.
+          find fin-package-solus -name "fin-*-solus.tar.gz" -exec mv {} . \;
+          # Do the same for the Arch artifact.
+          find fin-package-arch -name "fin-*-arch.tar.gz" -exec mv {} . \;
+          # (Optionally, flatten Debian and RPM if they are nested)
+          find fin-package-debian -name "fin_*.deb" -exec mv {} . \;
+          find fin-package-rpm -name "fin*.rpm" -exec mv {} . \;
+
       - name: Install release dependencies
         run: sudo apt-get update && sudo apt-get install -y libglib2.0-dev libcairo2-dev
 
@@ -70,8 +83,7 @@ jobs:
       - name: Upload Release Artifacts using GitHub CLI
         run: |
           gh release upload "${{ steps.extract-tag.outputs.tag }}" \
-          fin_*.deb fin*.rpm fin-package-solus/fin-*-solus.tar.gz fin-package-arch/fin-*-arch.tar.gz
-
+            fin_*.deb fin*.rpm fin-*-solus.tar.gz fin-*-arch.tar.gz
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -80,6 +92,3 @@ jobs:
           gh release publish "${{ steps.extract-tag.outputs.tag }}"
         env:
           GH_TOKEN: ${{ github.token }}
-
-
-
