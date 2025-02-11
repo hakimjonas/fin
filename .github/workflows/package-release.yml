@@ -12,36 +12,38 @@ jobs:
     env:
       PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig
     steps:
-      # 1. Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Install system dependencies
+      - name: Cache Cargo registry and build
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: "${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}"
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y curl libgtk-4-dev build-essential pkg-config rpm
 
-      # 3. Set up Rust toolchain
       - name: Set up Rust toolchain
         run: rustup default stable
 
-      # 4. Install cargo-make
       - name: Install cargo-make
         run: cargo install cargo-make
 
-      # 5. Build and test
       - name: Build project in release mode
         run: cargo build --release
 
       - name: Run tests
         run: cargo test
 
-      # 6. Run packaging tasks
       - name: Run packaging tasks
         run: cargo make package
 
-      # 7. Prepare artifacts in a flat directory
       - name: Prepare artifacts for upload
         run: |
           mkdir -p artifacts
@@ -50,27 +52,8 @@ jobs:
           cp target/fin-*-solus.tar.gz artifacts/
           cp target/fin-*-arch.tar.gz artifacts/
 
-      # 8. Upload artifacts
-      - name: Upload Debian artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: fin-package-debian
-          path: artifacts/fin-package-debian.zip
-
-      - name: Upload RPM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: fin-package-rpm
-          path: artifacts/fin-package-rpm.zip
-
-      - name: Upload Solus artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: fin-package-solus
-          path: artifacts/fin-package-solus.zip
-
-      - name: Upload Arch artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: fin-package-arch
-          path: artifacts/fin-package-arch.zip
+          name: build-artifacts
+          path: artifacts/*
