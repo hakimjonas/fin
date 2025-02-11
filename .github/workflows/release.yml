@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
@@ -34,6 +36,7 @@ jobs:
 
       - name: Create Release using GitHub CLI
         run: |
+          cd $GITHUB_WORKSPACE  
           gh release create "$tag" \
             --title "Release $tag" \
             --notes "Release notes go here"
