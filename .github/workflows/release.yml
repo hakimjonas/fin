@@ -9,7 +9,7 @@ on:
 jobs:
   build_and_package:
     # Call the reusable workflow from your repository.
-    # Using your default branch "trunk" since that's where the file is.
+    # Note: using your default branch "trunk" here.
     uses: hakimjonas/fin/.github/workflows/package-release.yml@trunk
     secrets:
       RELEASE: ${{ secrets.RELEASE }}
@@ -18,12 +18,12 @@ jobs:
     needs: build_and_package
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # This allows the job to create releases.
+      contents: write  # Ensure the job has write permission to create releases.
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Download artifacts produced by build_and_package job.
+      # Download artifacts that were uploaded in the build_and_package job.
       - name: Download Debian Artifact
         uses: actions/download-artifact@v4
         with:
@@ -52,22 +52,30 @@ jobs:
           curl -fsSL https://cli.github.com/packages/install.sh | sh
         continue-on-error: true
 
+      # Extract the tag name from GITHUB_REF (e.g., "refs/tags/v1.0.0" becomes "v1.0.0")
+      - name: Extract tag from GITHUB_REF
+        id: extract-tag
+        run: |
+          tag=$(echo "${GITHUB_REF}" | sed 's/^refs\/tags\///')
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+
       - name: Create Release using GitHub CLI
         run: |
-          gh release create "${{ github.ref }}" \
-            --title "Release ${{ github.ref }}" \
+          gh release create "${{ steps.extract-tag.outputs.tag }}" \
+            --title "Release ${{ steps.extract-tag.outputs.tag }}" \
             --notes "Release notes go here"
         env:
           GH_TOKEN: ${{ github.token }}
 
       - name: Upload Release Artifacts using GitHub CLI
         run: |
-          gh release upload "${{ github.ref }}" \
+          gh release upload "${{ steps.extract-tag.outputs.tag }}" \
             fin_*.deb fin_*-rpm.tar.gz fin_*-solus.tar.gz fin_*-arch.tar.gz
         env:
           GH_TOKEN: ${{ github.token }}
 
       - name: Publish Release
-        run: gh release publish "${{ github.ref }}"
+        run: |
+          gh release publish "${{ steps.extract-tag.outputs.tag }}"
         env:
           GH_TOKEN: ${{ github.token }}
