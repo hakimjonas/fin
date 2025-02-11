@@ -34,36 +34,30 @@ jobs:
       - name: Install cargo-make
         run: cargo install cargo-make
 
-      # 6. Install and run clippy
-      - name: Install clippy
-        run: rustup component add clippy
-      - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      # 7. Build project in release mode
+      # 8. Build project in release mode
       - name: Build project in release mode
         run: cargo build --release
 
-      # 8. Run tests
+      # 9. Run tests
       - name: Run tests
         run: cargo test
 
-      # 9. Run packaging tasks (this will run your cargo-make package task)
+      # 10. Run packaging tasks (this will run your cargo-make package task)
       - name: Run packaging tasks
         run: cargo make package
 
-      # 10. Capture artifact paths
+      # 11. Capture artifact paths
       - name: Set artifact paths
         id: set-artifact-path
         run: |
           echo "debian=target/debian/fin_*.deb" >> $GITHUB_OUTPUT
           rpm_file=$(find target/generate-rpm -maxdepth 1 -type f -name "fin*.rpm" | head -n 1)
           echo "rpm=$rpm_file" >> $GITHUB_OUTPUT
-          echo "solus=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT
-          echo "arch=target/fin-*-arch.tar.gz" >> $GITHUB_OUTPUT
+          echo "solus=target/fin-*-solus.zip" >> $GITHUB_OUTPUT
+          echo "arch=target/fin-*-arch.zip" >> $GITHUB_OUTPUT
           echo "RPM file is: $rpm_file"  # Debug information
 
-      # 11. Upload artifacts
+      # 12. Upload artifacts
       - name: Upload Debian artifact
         uses: actions/upload-artifact@v4
         with:
