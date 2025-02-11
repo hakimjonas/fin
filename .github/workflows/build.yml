@@ -70,7 +70,7 @@ jobs:
               eopkg it -y curl libgtk-4-devel gcc
               ;;
             nix)
-              apt-get update && apt-get install -y curl  # Base dependencies
+              apt-get update && apt-get install -y curl build-essential pkg-config  
               ;;
           esac
 
