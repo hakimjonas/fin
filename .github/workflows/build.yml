@@ -74,18 +74,17 @@ jobs:
               ;;
           esac
 
-      - name: Clean cargo cache
-        if: matrix.distro == 'fedora'
-        run: |
-          cargo clean
-          rm -rf ~/.cargo/registry/index/*
-
-
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-make
         run: cargo install cargo-make
+
+      - name: Clean cargo cache
+        if: matrix.distro == 'fedora'
+        run: |
+          cargo clean
+          rm -rf ~/.cargo/registry/index/*
 
       - name: Build project
         run: cargo build --release
