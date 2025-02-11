@@ -1,11 +1,12 @@
-name: CI - Multi-Distro Build & Test
+name: Build and Package
 
 on:
-  push:
-    branches:
-      - '**'
-  workflow_dispatch: { }
-  workflow_call: { }
+  workflow_call:
+    inputs:
+      tag:
+        required: false
+        type: string
+  workflow_dispatch:
 
 jobs:
   build:
@@ -15,28 +16,34 @@ jobs:
         include:
           - distro: ubuntu
             container: ubuntu:latest
+            artifact_path: target/debian/*.deb
           - distro: fedora
             container: fedora:latest
+            artifact_path: target/rpm/*.rpm
           - distro: arch
             container: archlinux:latest
+            artifact_path: target/*-arch.tar.gz
           - distro: solus
             container: hakimjonas/fin-gtk:latest
+            artifact_path: target/*-solus.tar.gz
+
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.container }}
       options: --entrypoint ""
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Cache Cargo dependencies
+      - name: Cache dependencies
         uses: actions/cache@v3
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: "${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}"
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
 
       - name: Install system dependencies
         run: |
@@ -51,8 +58,8 @@ jobs:
               pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
               ;;
             solus)
-              eopkg up -y || echo "Update failed, continuing..."
-              eopkg it -y curl libgtk-4-devel gcc || echo "Installation failed, continuing..."
+              eopkg up -y
+              eopkg it -y curl libgtk-4-devel gcc
               ;;
           esac
 
@@ -62,33 +69,17 @@ jobs:
       - name: Install cargo-make
         run: cargo install cargo-make
 
-      - name: Install Clippy
-        run: rustup component add clippy
-
-      - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Build project in release mode
+      - name: Build project
         run: cargo build --release
 
       - name: Run tests
         run: cargo test
 
-      - name: Run packaging tasks
+      - name: Package
         run: cargo make package
 
-      - name: Set artifact path
-        id: set-artifact-path
-        run: |
-          case "${{ matrix.distro }}" in
-            ubuntu) echo "path=target/debian/fin_*.deb" >> $GITHUB_OUTPUT ;;
-            fedora) echo "path=target/fin-*.rpm" >> $GITHUB_OUTPUT ;;
-            arch) echo "path=target/fin-*-arch.tar.gz" >> $GITHUB_OUTPUT ;;
-            solus) echo "path=target/fin-*-solus.tar.gz" >> $GITHUB_OUTPUT ;;
-          esac
-
-      - name: Upload packaging artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: fin-package-${{ matrix.distro }}
-          path: ${{ steps.set-artifact-path.outputs.path }}
+          name: fin-${{ matrix.distro }}
+          path: ${{ matrix.artifact_path }}
