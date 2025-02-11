@@ -55,12 +55,6 @@ script = [
     "sudo apt-get install -y libgtk-4-dev"
 ]
 
-[tasks.install-dependencies-fedora]
-description = "Install dependencies on Fedora"
-script = [
-    "sudo dnf install -y gtk4-devel pkgconf-pkg-config"
-]
-
 [tasks.install-dependencies-arch]
 description = "Install dependencies on Arch Linux"
 script = [
@@ -82,9 +76,6 @@ script = [
     "  case $ID in",
     "    ubuntu|debian)",
     "      cargo make install-dependencies-ubuntu",
-    "      ;;",
-    "    fedora)",
-    "      cargo make install-dependencies-fedora",
     "      ;;",
     "    arch)",
     "      cargo make install-dependencies-arch",
@@ -116,18 +107,6 @@ script = [
     "cargo install cargo-deb --version 1.42.0 || true",
     "echo 'Packaging .deb...'",
     "cargo deb --no-build"
-]
-
-[tasks.package-rpm]
-description = "Package Finë as an .rpm using cargo-generate-rpm"
-dependencies = ["build-release"]
-script = [
-    "echo 'Installing cargo-generate-rpm (if needed)...'",
-    "cargo install cargo-generate-rpm --version 0.15.2 || true",
-    "echo 'Packaging .rpm...'",
-    "cargo build --release",
-    "strip -s target/release/fin",
-    "cargo generate-rpm"
 ]
 
 [tasks.package-solus]
@@ -170,11 +149,10 @@ script = [
 ]
 
 [tasks.package]
-description = "Package Finë for distribution (.deb, .rpm, Solus, Arch, and Nix)"
+description = "Package Finë for distribution (Debian, Solus, Arch, and Nix)"
 dependencies = [
     "build-release",
     "package-deb",
-    "package-rpm",
     "package-solus",
     "package-arch",
     "package-nix"

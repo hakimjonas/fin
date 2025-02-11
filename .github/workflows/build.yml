@@ -1,0 +1,94 @@
+name: Build and Package
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: false
+        type: string
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu
+            package_task: deb
+            container: ubuntu:latest
+            artifact_path: target/debian/*.deb
+          - distro: arch
+            package_task: arch
+            container: archlinux:latest
+            artifact_path: target/*-arch.tar.gz
+          - distro: solus
+            package_task: solus
+            container: hakimjonas/fin-gtk:latest
+            artifact_path: target/*-solus.tar.gz
+          - distro: nix
+            package_task: nix
+            container: ubuntu:latest
+            artifact_path: target/*-nix.tar.gz
+
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.container }}
+      options: --entrypoint ""
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
+
+      - name: Install system dependencies
+        run: |
+          case "${{ matrix.distro }}" in
+            ubuntu)
+              apt-get update && apt-get install -y curl libgtk-4-dev build-essential pkg-config
+              ;;
+            arch)
+              pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
+              ;;
+            solus)
+              eopkg up -y
+              eopkg it -y curl libgtk-4-devel gcc
+              ;;
+            nix)
+              apt-get update && apt-get install -y curl build-essential pkg-config libglib2.0-dev libgtk-4-dev
+              ;;
+          esac
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-make
+        run: cargo install cargo-make
+
+      - name: Build project
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Package
+        run: cargo make package-${{ matrix.package_task }}
+
+      - name: Verify artifacts
+        run: |
+          echo "Artifact path: ${{ matrix.artifact_path }}"
+          ls -la $(dirname "${{ matrix.artifact_path }}") || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fin-${{ matrix.distro }}
+          path: ${{ matrix.artifact_path }}
