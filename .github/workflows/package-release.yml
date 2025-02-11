@@ -22,11 +22,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y curl libgtk-4-dev build-essential pkg-config rpm
 
-      # 3. Set PKG_CONFIG_PATH (already set via env, but we echo to confirm)
+      # 3. Confirm PKG_CONFIG_PATH
       - name: Confirm PKG_CONFIG_PATH
         run: echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
 
-      # 4. Set up Rust toolchain (rustup is on the runner)
+      # 4. Set up Rust toolchain
       - name: Set up Rust toolchain
         run: rustup default stable
 
@@ -48,20 +48,9 @@ jobs:
       - name: Run tests
         run: cargo test
 
-      # 9. Run packaging tasks (cargo make package)
+      # 9. Run packaging tasks (this will run your cargo-make package task)
       - name: Run packaging tasks
         run: cargo make package
-
-      # 9.5 Rename the RPM file to remove invalid characters (e.g., the question mark)
-      - name: Sanitize RPM filename
-        run: |
-          for f in target/generate-rpm/fin*.rpm; do
-            newf=$(echo "$f" | sed 's/%{?dist}//g')
-            if [ "$f" != "$newf" ]; then
-              echo "Renaming $f to $newf"
-              mv "$f" "$newf"
-            fi
-          done
 
       # 10. Capture artifact paths
       - name: Set artifact paths

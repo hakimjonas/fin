@@ -31,7 +31,7 @@ strip = "symbols"
 [package.metadata.generate-rpm]
 name = "fin"
 version = "0.1.0"
-release = "1%{?dist}"
+release = "1"
 summary = "GTK4-based session controller"
 license = "MIT"
 url = "https://github.com/hakimjonas/fin"
