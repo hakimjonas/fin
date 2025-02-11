@@ -1,0 +1,68 @@
+# .github/workflows/reusable-release.yml
+name: Reusable Release Workflow
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag'
+        required: true
+        type: string
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: artifacts/
+
+      - name: Ensure Artifacts Are Present
+        run: |
+          ls -lah artifacts/
+          if [ -z "$(ls -A artifacts/)" ]; then
+            echo "❌ No artifacts found. Exiting."
+            exit 1
+          fi
+
+      - name: Create or Update Release using GitHub CLI
+        run: |
+          if gh release view "${{ inputs.tag }}" > /dev/null 2>&1; then
+            echo "🔄 Release already exists. Updating..."
+            gh release edit "${{ inputs.tag }}" \
+              --title "Release ${{ inputs.tag }}" \
+              --notes "Updated release notes"
+          else
+            echo "🚀 Creating new release..."
+            gh release create "${{ inputs.tag }}" \
+              --title "Release ${{ inputs.tag }}" \
+              --notes "Release notes go here"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Artifacts using GitHub CLI
+        run: |
+          for file in artifacts/*; do
+            echo "⬆ Uploading $file..."
+            gh release upload "${{ inputs.tag }}" "$file"
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Release
+        run: gh release edit "${{ inputs.tag }}" --draft=false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -3,72 +3,28 @@ name: Release
 on:
   push:
     tags:
-      - "v*.*.*"
+      - 'v*.*.*'
   workflow_dispatch:
 
 jobs:
   build_and_package:
-    uses: hakimjonas/fin/.github/workflows/package-release.yml@trunk
+    uses: ./.github/workflows/ci.yml
     secrets:
       RELEASE: ${{ secrets.RELEASE }}
 
   release:
     needs: build_and_package
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: build-artifacts 
+          name: build-artifacts
           path: artifacts/
 
-      - name: Extract tag from GITHUB_REF
-        id: extract-tag
-        run: |
-          tag=$(echo "${GITHUB_REF}" | sed 's/^refs\/tags\///')
-          echo "tag=$tag" >> $GITHUB_ENV
-
-      - name: Ensure Artifacts Are Present
-        run: |
-          ls -lah artifacts/
-          if [ -z "$(ls -A artifacts/)" ]; then
-            echo "❌ No artifacts found. Exiting."
-            exit 1
-          fi
-
-      - name: Create or Update Release using GitHub CLI
-        run: |
-          if gh release view "$tag" > /dev/null 2>&1; then
-            echo "🔄 Release already exists. Updating..."
-            gh release edit "$tag" \
-              --title "Release $tag" \
-              --notes "Updated release notes"
-          else
-            echo "🚀 Creating new release..."
-            gh release create "$tag" \
-              --title "Release $tag" \
-              --notes "Release notes go here"
-          fi
+      - name: Reusable Release
+        uses: ./.github/workflows/reusable-release.yml
+        with:
+          tag: ${{ github.ref_name }}
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Release Artifacts using GitHub CLI
-        run: |
-          for file in artifacts/*; do
-            echo "⬆ Uploading $file..."
-            gh release upload "$tag" "$file"
-          done
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish Release
-        run: gh release edit "$tag" --draft=false
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
