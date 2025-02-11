@@ -21,7 +21,7 @@ jobs:
           - distro: fedora
             package_task: rpm
             container: fedora:latest
-            artifact_path: target/release/rpmbuild/RPMS/*/*.rpm
+            artifact_path: target/rpmbuild/RPMS/**/*.rpm
           - distro: arch
             package_task: arch
             container: archlinux:latest
@@ -70,7 +70,7 @@ jobs:
               eopkg it -y curl libgtk-4-devel gcc
               ;;
             nix)
-              apt-get update && apt-get install -y curl build-essential pkg-config  
+              apt-get update && apt-get install -y curl      build-essential pkg-config libglib2.0-dev libgtk-4-dev           
               ;;
           esac
 
@@ -97,6 +97,12 @@ jobs:
         run: |
           echo "Artifact path: ${{ matrix.artifact_path }}"
           ls -la $(dirname "${{ matrix.artifact_path }}") || true
+          if [ "${{ matrix.distro }}" == "fedora" ]; then
+            echo "RPM build tree:"
+            tree target/rpmbuild || true
+            echo "Looking for RPMs:"
+            find target/rpmbuild -name '*.rpm' || echo "No RPMs found"
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

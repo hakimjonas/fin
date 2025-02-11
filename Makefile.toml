@@ -122,12 +122,10 @@ script = [
 description = "Package Finë as an .rpm using cargo-generate-rpm"
 dependencies = ["build-release"]
 script = [
-    "echo 'Installing cargo-generate-rpm (if needed)...'",
-    "cargo install cargo-generate-rpm --version 0.15.2 || true",
-    "echo 'Packaging .rpm...'",
-    "cargo build --release",
-    "strip -s target/release/fin",
-    "cargo generate-rpm"
+    "echo 'Installing cargo-generate-rpm...'",
+    "cargo install cargo-generate-rpm@0.16.0",
+    "echo 'Building RPM...'",
+    "cargo generate-rpm --output-dir target/rpmbuild/RPMS"
 ]
 
 [tasks.package-solus]
