@@ -36,6 +36,7 @@ jobs:
       image: ${{ matrix.container }}
       options: --entrypoint ""
     env:
+      # Pass the workflow input (if any) into the script.
       TAG: ${{ inputs.tag }}
 
     steps:
@@ -71,7 +72,7 @@ jobs:
               ;;
           esac
 
-      # Install Rust (and Cargo) so that they're available for the sync script and subsequent steps.
+      # Install Rust (and Cargo) so they're available for the sync script and subsequent steps.
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 

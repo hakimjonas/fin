@@ -14,7 +14,7 @@ fi
 # 3. If TAG_VERSION is still empty, then error out.
 if [[ -z "$TAG_VERSION" ]]; then
   echo "❌ No version provided via TAG and no valid git tag found."
-  echo "Please supply a valid semantic version (e.g., 0.2.0) either via the workflow input or by ensuring the repository has a valid git tag."
+  echo "Please supply a valid semantic version (e.g., 0.2.0) via the workflow input or ensure the repository has a valid git tag."
   exit 1
 fi
 
@@ -24,7 +24,14 @@ if ! [[ "$TAG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 1
 fi
 
-echo "📌 Using version: $TAG_VERSION"
+echo "📌 Current version: $TAG_VERSION"
+
+# 5. Automatically increment the patch version.
+IFS='.' read -r major minor patch <<< "$TAG_VERSION"
+new_patch=$((patch + 1))
+NEW_VERSION="${major}.${minor}.${new_patch}"
+echo "🔼 Bumping patch version: $TAG_VERSION -> $NEW_VERSION"
+TAG_VERSION="$NEW_VERSION"
 
 echo "📦 Updating Cargo.toml..."
 cargo install cargo-edit --debug || true  # Install cargo-edit if missing
