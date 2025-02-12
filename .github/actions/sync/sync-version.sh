@@ -11,6 +11,7 @@ if [[ -z "$TAG_VERSION" ]]; then
     exit 1
 fi
 
+
 echo "📌 Using version: $TAG_VERSION"
 
 # Step 2: Ensure Cargo.toml is updated to match the Git tag
@@ -54,6 +55,6 @@ tar -czvf "target/fin-${TAG_VERSION}-arch.tar.gz" -C target/package/arch .
 tar -czvf "target/fin-${TAG_VERSION}-nix.tar.gz" -C target/package/nix .
 
 echo "🎉 Packaging complete! Artifacts created in target/:"
-ls -lh target/fin-${TAG_VERSION}-*
+ls -lh target/fin-"${TAG_VERSION}"-*
 
 echo "✅ All steps completed successfully!"
