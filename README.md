@@ -18,20 +18,11 @@ enchanting project, officially called Finë, must humble itself. For everyday us
 in ASCII. Think of it as trading a lavish farewell in an enchanted forest for a polite nod at the bus stop—simple,
 reliable, and free from typographical misadventures.
 
-## Features
+## Default Style
 
-**Finë** is designed to be simple and effective—but we know there’s always room to grow. In the spirit of open-source
-collaboration, we welcome ideas and contributions from the community. Here are some potential areas where your
-contributions could make a difference:
+![default-style](https://github.com/user-attachments/assets/f99f3644-8822-4c3a-8e70-d0379ca28e32)
 
-- **Enhanced Theming and Customization**:
-  While Finë’s interface is intentionally minimal, there’s potential to offer customizable themes, icons, and even
-  subtle animations. Contributions in this area could let users personalize the look and feel to match their desktop
-  environment.
-
-- **Broader Configuration Support**:
-  Currently, configuration is done via TOML. You might help by adding support for other popular configuration formats (
-  like JSON or YAML), thereby giving users more flexibility.
+The default css - not claiming to be a css artist just wanted to provide a simply non ugly default. Colors are borrowed from the famous [Catppuccin](https://catppuccin.com/) theme.
 
 ## Dependencies
 
