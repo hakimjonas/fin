@@ -1,32 +1,23 @@
+//! A GTK4-based logout manager for Finë.
 //!
-//! A GTK4-based logout manager for Finë. This application reads its configuration
-//! from a TOML file, creates a grid-based UI with buttons for various commands, and supports
-//! cyclic keyboard navigation. The design emphasizes functional programming principles,
-//! using immutable data structures and pure functions where possible.
-//!
-//! Accessibility enhancements have been added by using widget labels and tooltips
-//! to convey descriptive information for assistive technologies.
+//! This application reads its configuration from a TOML file, creates a grid-based UI with buttons for various commands, and supports cyclic keyboard navigation. It emphasizes functional programming principles, using immutable data structures and pure functions where possible.
 //!
 //! **Note on paths:**
-//! In the configuration file, relative paths for resources (e.g. the CSS file) are resolved
-//! relative to the directory containing the configuration file. For example, if your config file is
-//! located at `~/.config/fin/config.toml` and it specifies:
+//! Relative paths for resources (e.g., the CSS file) are resolved relative to the directory containing the configuration file. For example, if your config file is located at `~/.config/fin/config.toml` and it specifies:
 //!
 //! ```toml
 //! stylesheet = "new_style.css"
 //! use_system_theme = false
 //! ```
 //!
-//! then the application will resolve the stylesheet as `~/.config/new_style.css`.
-//! If that file is not found, the application will fall back to its default CSS file
-//! (e.g. `/usr/share/fin/style.css`) and warn the user. If even the default CSS is missing
-//! and `use_system_theme` is true, a basic system theme will be used.
-//!
+//! The application will resolve the stylesheet as `~/.config/fin/new_style.css`. If that file is not found, it will fall back to its default CSS file (e.g., `/usr/share/fin/style.css`) and warn the user. If even the default CSS is missing and `use_system_theme` is true, a basic system theme will be used.
 
 use anyhow::{anyhow, Context, Result};
 use clap::{parser::ValueSource, Arg, Command};
+// If you are not using Display elsewhere, you may remove this import:
+// use gtk4::gdk::Display;
 use glib::Propagation;
-use gtk4::gdk::Display;
+// We need these for CSS loading.
 use gtk4::{
     gdk, prelude::*, Application, ApplicationWindow, Button, CssProvider, EventControllerFocus,
     EventControllerKey, Grid, STYLE_PROVIDER_PRIORITY_APPLICATION,
@@ -40,6 +31,123 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use std::rc::Rc;
+//
+// Helper Functions for Configuration and CSS Resolution
+//
+
+/// Determines the configuration file path by checking in order:
+/// - `XDG_CONFIG_HOME` (or `HOME`) based default location,
+/// - Falls back to `/usr/share/fin/config.toml`.
+fn determine_config_path() -> PathBuf {
+    env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .or_else(|| {
+            env::var_os("HOME").map(|home| {
+                PathBuf::from(home)
+                    .join(".config")
+                    .join("fin")
+                    .join("config.toml")
+            })
+        })
+        .filter(|path| path.exists() && path.is_file())
+        .unwrap_or_else(|| PathBuf::from("/usr/share/fin/config.toml"))
+}
+
+/// Selects the CSS file path according to these rules:
+/// 1. If `use_system_theme` is true, ignore any provided CSS and use the system fallback.
+/// 2. Otherwise, if a user CSS path is provided, resolve it relative to the config file:
+///    - If the file exists, use it.
+///    - Otherwise, warn and fall back to the default CSS.
+/// 3. If no user CSS is provided, use the default CSS.
+fn select_css_path(
+    config_css: Option<String>,
+    config_path: &Path,
+    default_css: &Path,
+    use_system_theme: bool,
+) -> Result<PathBuf> {
+    if use_system_theme {
+        info!("use_system_theme is true; system theme will be used.");
+        return Ok(default_css.to_path_buf());
+    }
+    config_css
+        .map(|user_css_str| {
+            let p = PathBuf::from(&user_css_str);
+            if p.is_absolute() {
+                p
+            } else {
+                config_path
+                    .parent()
+                    .map(|parent| parent.join(&p))
+                    .unwrap_or(p)
+            }
+        })
+        .map_or_else(
+            || {
+                info!(
+                    "No user CSS provided. Using default CSS '{}'.",
+                    default_css.display()
+                );
+                if default_css.exists() {
+                    Ok(default_css.to_path_buf())
+                } else {
+                    Err(anyhow!("No valid CSS file could be found."))
+                }
+            },
+            |user_css_path| {
+                if user_css_path.exists() {
+                    Ok(user_css_path)
+                } else {
+                    warn!(
+                        "User provided CSS '{}' not found. Falling back to default CSS '{}'.",
+                        user_css_path.display(),
+                        default_css.display()
+                    );
+                    if default_css.exists() {
+                        Ok(default_css.to_path_buf())
+                    } else {
+                        Err(anyhow!("No valid CSS file could be found."))
+                    }
+                }
+            },
+        )
+}
+
+/// Loads the CSS file. If `use_system_theme` is true, always loads a basic system fallback CSS.
+fn load_css(path: &Path, use_system_theme: bool) -> Result<()> {
+    let provider = CssProvider::new();
+    if use_system_theme {
+        info!("use_system_theme is true; loading system fallback CSS.");
+        provider.load_from_string("button { font-size: 72px; }");
+    } else {
+        match fs::read(path) {
+            Ok(css_data) => {
+                let css_str = std::str::from_utf8(&css_data)
+                    .with_context(|| format!("CSS file '{}' is not valid UTF-8", path.display()))?;
+                provider.load_from_string(css_str);
+                info!("Loaded CSS from '{}'", path.display());
+            }
+            Err(e) => {
+                return Err(anyhow!(
+                    "CSS file '{}' does not exist or cannot be read: {}",
+                    path.display(),
+                    e
+                ));
+            }
+        }
+    }
+    let display =
+        gdk::Display::default().ok_or_else(|| anyhow!("Could not get default display"))?;
+    gtk4::style_context_add_provider_for_display(
+        &display,
+        &provider,
+        STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
+    Ok(())
+}
+
+//
+// Configuration Structures and Loading
+//
 
 fn default_columns() -> usize {
     1
@@ -90,7 +198,6 @@ fn load_config(path: &Path) -> Result<Config> {
     let config: Config = fs::read_to_string(path)
         .with_context(|| format!("Could not read config file {:?}", path))
         .and_then(|content| toml::from_str(&content).context("TOML deserialization error"))?;
-
     if config.columns == 0 {
         return Err(anyhow!(
             "Invalid configuration: columns must be greater than 0"
@@ -118,6 +225,10 @@ fn get_commands_for_de(de: &str, config: &Config) -> Vector<ButtonConfig> {
         _ => config.buttons.clone(),
     }
 }
+
+//
+// UI and Navigation Functions
+//
 
 /// Calculates the grid layout as a nested vector of button indices.
 fn calculate_layout(num_buttons: usize) -> std::result::Result<Vector<Vector<usize>>, String> {
@@ -216,98 +327,10 @@ fn create_buttons(app: &Application, btn_configs: &Vector<ButtonConfig>) -> Vect
     btn_configs
         .iter()
         .map(|btn_cfg| create_action_button(app, &btn_cfg.label, &btn_cfg.command))
-        .collect()
+        .collect::<Vector<_>>()
 }
 
-/// Helper function to select the CSS file according to these rules:
-/// 1. If the user config provides a CSS path, resolve it relative to the config file.
-///    - If the file exists, use it.
-///    - Otherwise, warn and fall back to the default CSS.
-/// 2. If no user CSS is provided, use the default CSS.
-/// 3. (Note: if `use_system_theme` is true, we ignore any provided CSS.)
-fn select_css_path(
-    config_css: Option<String>,
-    config_path: &Path,
-    default_css: &Path,
-    use_system_theme: bool,
-) -> Result<PathBuf> {
-    if use_system_theme {
-        // When system theme is desired, we ignore any CSS file and let load_css load the fallback.
-        info!("use_system_theme is true; system theme will be used.");
-        return Ok(default_css.to_path_buf());
-    }
-    match config_css {
-        Some(user_css_str) => {
-            let p = PathBuf::from(&user_css_str);
-            let user_css_path = match p.is_absolute() {
-                true => p.clone(),
-                false => config_path
-                    .parent()
-                    .map(|parent| parent.join(&p))
-                    .unwrap_or(p.clone()),
-            };
-            match user_css_path.exists() {
-                true => Ok(user_css_path),
-                false => {
-                    warn!(
-                        "User provided CSS '{}' not found. Falling back to default CSS '{}'.",
-                        user_css_path.display(),
-                        default_css.display()
-                    );
-                    if default_css.exists() {
-                        Ok(default_css.to_path_buf())
-                    } else {
-                        Err(anyhow!("No valid CSS file could be found."))
-                    }
-                }
-            }
-        }
-        None => {
-            info!(
-                "No user CSS provided. Using default CSS '{}'.",
-                default_css.display()
-            );
-            if default_css.exists() {
-                Ok(default_css.to_path_buf())
-            } else {
-                Err(anyhow!("No valid CSS file could be found."))
-            }
-        }
-    }
-}
-
-/// Loads the CSS file.
-fn load_css(path: &Path, use_system_theme: bool) -> Result<()> {
-    let provider = CssProvider::new();
-    if use_system_theme {
-        info!("use_system_theme is true; loading system fallback CSS.");
-        provider.load_from_string("button { font-size: 72px; }");
-    } else {
-        match fs::read(path) {
-            Ok(css_data) => {
-                let css_str = std::str::from_utf8(&css_data)
-                    .with_context(|| format!("CSS file '{}' is not valid UTF-8", path.display()))?;
-                provider.load_from_string(css_str);
-                info!("Loaded CSS from '{}'", path.display());
-            }
-            Err(e) => {
-                return Err(anyhow!(
-                    "CSS file '{}' does not exist or cannot be read: {}",
-                    path.display(),
-                    e
-                ));
-            }
-        }
-    }
-    let display = Display::default().ok_or_else(|| anyhow!("Could not get default display"))?;
-    gtk4::style_context_add_provider_for_display(
-        &display,
-        &provider,
-        STYLE_PROVIDER_PRIORITY_APPLICATION,
-    );
-    Ok(())
-}
-
+/// Creates a GTK button that executes a command when clicked.
 fn create_action_button(app: &Application, label: &str, command: &str) -> Button {
     let button = Button::with_label(label);
     button.set_tooltip_text(Some(&format!("Executes command: {}", command)));
@@ -331,16 +354,19 @@ fn create_action_button(app: &Application, label: &str, command: &str) -> Button
     button
 }
 
+/// Displays an error notification via logging.
 fn show_error_dialog(_app: &Application, message: &str) {
     error!("Error Notification: {}", message);
 }
 
+/// Sets the initial focus to the first button in the grid.
 fn setup_focus_chain(grid: &Grid, buttons: &Vector<Button>) {
     if let Some(first_button) = buttons.get(0) {
         grid.set_focus_child(Some(first_button));
     }
 }
 
+/// Sets up a focus controller that quits the application when the window loses focus.
 fn setup_focus_controller(window: &ApplicationWindow, app: &Application) {
     let app_clone = app.clone();
     let focus_controller = EventControllerFocus::new();
@@ -350,6 +376,7 @@ fn setup_focus_controller(window: &ApplicationWindow, app: &Application) {
     window.add_controller(focus_controller);
 }
 
+/// Sets up key event handlers for cyclic navigation of the buttons.
 fn setup_key_handlers(
     window: &ApplicationWindow,
     app: &Application,
@@ -367,10 +394,10 @@ fn setup_key_handlers(
         let app = app.clone();
         let buttons = buttons.clone();
         let current_index = current_index.clone();
-        controller.connect_key_pressed(move |_, keyval, _hardware_keycode, _state| {
+        controller.connect_key_pressed(move |_, key_value, _hardware_keycode, _state| {
             let total = buttons.len();
             let current = current_index.get();
-            let new_index = match keyval {
+            let new_index = match key_value {
                 gdk::Key::Escape => {
                     app.quit();
                     return Propagation::Stop;
@@ -397,6 +424,7 @@ fn setup_key_handlers(
     window.add_controller(controller);
 }
 
+/// Builds the user interface.
 fn build_ui(
     app: &Application,
     config: &Config,
@@ -423,7 +451,9 @@ fn build_ui(
     window.set_transient_for(None::<&ApplicationWindow>);
     window.set_resizable(false);
     window.set_tooltip_text(Some("Finë logout manager window"));
+
     load_css(stylesheet_path, config.use_system_theme)?;
+
     let grid = create_grid();
     grid.set_tooltip_text(Some("Button grid"));
     let layout = calculate_layout(buttons.len()).map_err(|e| anyhow!(e))?;
@@ -456,6 +486,7 @@ fn build_ui(
     Ok(())
 }
 
+/// Creates a new GTK grid container.
 fn create_grid() -> Grid {
     Grid::builder()
         .column_homogeneous(true)
@@ -469,6 +500,7 @@ fn create_grid() -> Grid {
         .build()
 }
 
+/// Detects the current desktop environment from environment variables.
 fn detect_desktop_environment() -> String {
     env::var("XDG_CURRENT_DESKTOP")
         .or_else(|_| env::var("DESKTOP_SESSION"))
@@ -480,8 +512,13 @@ fn detect_desktop_environment() -> String {
         .to_string()
 }
 
+//
+// Main Entry Point
+//
+
 fn main() -> Result<()> {
     env_logger::init();
+
     let matches = Command::new("fin")
         .version("0.1.0")
         .about("Finë Application")
@@ -504,25 +541,11 @@ fn main() -> Result<()> {
         }
     }
 
-    let config_path_str = matches
+    let config_path = matches
         .get_one::<String>("config")
-        .map(|s| s.as_str().to_string())
-        .unwrap_or_else(|| {
-            env::var_os("XDG_CONFIG_HOME")
-                .map(PathBuf::from)
-                .or_else(|| {
-                    env::var_os("HOME").map(|home| {
-                        PathBuf::from(home)
-                            .join(".config")
-                            .join("fin")
-                            .join("config.toml")
-                    })
-                })
-                .filter(|path| path.exists() && path.is_file())
-                .and_then(|path| path.to_str().map(|s| s.to_string()))
-                .unwrap_or_else(|| "/usr/share/fin/config.toml".to_string())
-        });
-    let config_path = PathBuf::from(&config_path_str);
+        .map(PathBuf::from)
+        .unwrap_or_else(determine_config_path);
+
     let config = load_config(&config_path)?;
     let de = detect_desktop_environment();
     let commands = get_commands_for_de(&de, &config);
@@ -530,7 +553,7 @@ fn main() -> Result<()> {
 
     let stylesheet_path = if config.use_system_theme {
         info!("use_system_theme is true; system theme will be used.");
-        default_css.clone() // dummy value; load_css will load the system fallback CSS.
+        default_css.clone() // Dummy value; load_css will load the system fallback CSS.
     } else {
         select_css_path(
             config.css_path.clone(),
@@ -543,6 +566,7 @@ fn main() -> Result<()> {
     let app = Application::builder()
         .application_id("com.fin.launcher")
         .build();
+
     let config_clone = config.clone();
     app.connect_activate(move |app| {
         if let Err(e) = build_ui(app, &config_clone, &stylesheet_path, &commands) {
@@ -550,9 +574,14 @@ fn main() -> Result<()> {
             std::process::exit(1);
         }
     });
+
     app.run();
     Ok(())
 }
+
+//
+// Tests
+//
 
 #[cfg(test)]
 mod tests {
@@ -672,7 +701,7 @@ mod tests {
 
     #[test]
     fn test_load_css_file_exists() -> Result<()> {
-        if Display::default().is_none() {
+        if gdk::Display::default().is_none() {
             eprintln!("Skipping test_load_css_file_exists because no default display found");
             return Ok(());
         }
@@ -687,7 +716,7 @@ mod tests {
 
     #[test]
     fn test_load_css_system_theme_fallback() -> Result<()> {
-        if Display::default().is_none() {
+        if gdk::Display::default().is_none() {
             eprintln!(
                 "Skipping test_load_css_system_theme_fallback because no default display found"
             );
@@ -701,7 +730,7 @@ mod tests {
 
     #[test]
     fn test_load_css_no_fallback() -> Result<()> {
-        if Display::default().is_none() {
+        if gdk::Display::default().is_none() {
             eprintln!("Skipping test_load_css_no_fallback because no default display found");
             return Ok(());
         }
