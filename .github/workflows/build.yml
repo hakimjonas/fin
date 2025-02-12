@@ -36,7 +36,6 @@ jobs:
       image: ${{ matrix.container }}
       options: --entrypoint ""
     env:
-      # Pass the input tag to the container as an environment variable
       TAG: ${{ inputs.tag }}
 
     steps:
@@ -71,6 +70,10 @@ jobs:
               ;;
           esac
 
+      # Install Rust (and Cargo) so that they’re available for the sync script
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Ensure sync-version script is executable
         run: chmod +x ./.github/actions/sync/sync-version.sh
         shell: bash
@@ -78,9 +81,6 @@ jobs:
       - name: Sync Version
         run: ./.github/actions/sync/sync-version.sh
         shell: bash
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-make
         run: cargo install cargo-make
