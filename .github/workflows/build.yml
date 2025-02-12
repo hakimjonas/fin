@@ -70,7 +70,7 @@ jobs:
               ;;
           esac
 
-      # Install Rust (and Cargo) so that they’re available for the sync script
+      # Install Rust (and Cargo) so that they're available for the sync script and subsequent steps.
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
