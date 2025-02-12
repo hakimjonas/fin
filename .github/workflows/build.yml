@@ -42,7 +42,6 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          # Remove sparse-checkout: false (not needed as it's the default)
 
       - name: Verify GitHub Actions Sync Directory
         run: |
@@ -50,6 +49,7 @@ jobs:
           echo "Checking .github/actions/sync:"
           ls -la .github/actions/sync || echo "Sync action directory missing!"
           find . -name "action.yml" || echo "action.yml not found!"
+
       - name: Install system dependencies (including Git)
         run: |
           case "${{ matrix.distro }}" in
@@ -68,8 +68,13 @@ jobs:
               ;;
           esac
 
+      - name: Ensure sync-version script is executable
+        run: chmod +x ./.github/actions/sync/sync-version.sh
+        shell: bash
+
       - name: Sync Version
-        uses: ./.github/actions/sync  # Calls the reusable action
+        run: ./.github/actions/sync/sync-version.sh
+        shell: bash
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
