@@ -40,17 +40,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          persist-credentials: false
+          fetch-depth: 0  # Ensure full history & tags are available
+          persist-credentials: false  # Ensure a clean clone inside the container
 
-      - name: Ensure Git Repository Exists (for Containers)
-        run: |
-          git config --global --add safe.directory $(pwd)
-          git init
-          git remote add origin https://github.com/${{ github.repository }}.git
-          git fetch --tags
-          git checkout ${{ github.ref_name }}
-
+      # ✅ Ensure Git is installed first!
       - name: Install system dependencies (including Git)
         run: |
           case "${{ matrix.distro }}" in
@@ -69,8 +62,17 @@ jobs:
               ;;
           esac
 
+      # ✅ Now Git is available, so Git commands will work
+      - name: Ensure Git Repository Exists (for Containers)
+        run: |
+          git config --global --add safe.directory $(pwd)
+          git init
+          git remote add origin https://github.com/${{ github.repository }}.git
+          git fetch --tags
+          git checkout ${{ github.ref_name }}
+
       - name: Verify Git Installation
-        run: git --version
+        run: git --version  # Ensures Git is available in the container
 
       - name: Sync Version and Update Artifacts
         run: ./sync-version.sh
