@@ -62,14 +62,16 @@ jobs:
               ;;
           esac
 
-      # ✅ Now Git is available, so Git commands will work
       - name: Ensure Git Repository Exists (for Containers)
         run: |
           git config --global --add safe.directory $(pwd)
           git init
           git remote add origin https://github.com/${{ github.repository }}.git
           git fetch --tags
-          git checkout ${{ github.ref_name }}
+          git reset --hard origin/${{ github.ref_name }}  # Reset all untracked changes
+          git clean -fdx  # Remove untracked files and directories
+          git checkout ${{ github.ref_name }}  # Now checkout should work
+
 
       - name: Verify Git Installation
         run: git --version  # Ensures Git is available in the container
