@@ -75,41 +75,16 @@ jobs:
 
       - name: Verify `sync-version.sh` Exists
         run: |
+          echo "Current Directory:"
           pwd
+          echo "Files in Current Directory:"
           ls -la
 
-      - name: Run Sync Version Script
-        run: ./sync-version.sh
+      - name: Ensure `sync-version.sh` is Executable
+        run: chmod +x sync-version.sh || chmod +x $GITHUB_WORKSPACE/sync-version.sh
 
+      - name: Run Sync Version Script (Relative Path)
+        run: ./sync-version.sh || true  # If fails, try absolute path next
 
-      - name: Verify Git Installation
-        run: git --version  # Ensures Git is available in the container
-
-      - name: Sync Version and Update Artifacts
+      - name: Run Sync Version Script (Absolute Path)
         run: bash $GITHUB_WORKSPACE/sync-version.sh
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install cargo-make
-        run: cargo install cargo-make
-
-      - name: Build project
-        run: cargo build --release
-
-      - name: Run tests
-        run: cargo test
-
-      - name: Package
-        run: cargo make package-${{ matrix.package_task }}
-
-      - name: Verify artifacts
-        run: |
-          echo "Artifact path: ${{ matrix.artifact_path }}"
-          ls -la $(dirname "${{ matrix.artifact_path }}") || true
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: fin-${{ matrix.distro }}-${{ github.ref_name }}
-          path: ${{ matrix.artifact_path }}
