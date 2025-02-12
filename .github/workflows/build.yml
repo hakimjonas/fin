@@ -68,9 +68,18 @@ jobs:
           git init
           git remote add origin https://github.com/${{ github.repository }}.git
           git fetch --tags
+          git fetch origin ${{ github.ref_name }}  # Ensure we fetch the branch
           git reset --hard origin/${{ github.ref_name }}  # Reset all untracked changes
           git clean -fdx  # Remove untracked files and directories
-          git checkout ${{ github.ref_name }}  # Now checkout should work
+          git checkout ${{ github.ref_name }}  # Explicitly checkout the branch
+
+      - name: Verify `sync-version.sh` Exists
+        run: |
+          pwd
+          ls -la
+
+      - name: Run Sync Version Script
+        run: ./sync-version.sh
 
 
       - name: Verify Git Installation
