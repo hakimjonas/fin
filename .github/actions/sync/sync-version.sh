@@ -5,7 +5,8 @@ echo "🔄 Syncing Version and Updating Build Artifacts..."
 
 # 1. Use the provided TAG environment variable if available.
 if [[ -n "$TAG" ]]; then
-  TAG_VERSION="$TAG"
+  # Strip a leading 'v' if it exists.
+  TAG_VERSION="${TAG#v}"
 # 2. Otherwise, if a .git directory is available, try to get the latest tag.
 elif [ -d ".git" ]; then
   TAG_VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
@@ -14,7 +15,7 @@ fi
 # 3. If TAG_VERSION is still empty, then error out.
 if [[ -z "$TAG_VERSION" ]]; then
   echo "❌ No version provided via TAG and no valid git tag found."
-  echo "Please supply a valid semantic version (e.g., 0.2.0) via the workflow input or ensure the repository has a valid git tag."
+  echo "Please supply a valid semantic version (e.g., 0.2.0) either via the workflow input or by ensuring the repository has a valid git tag."
   exit 1
 fi
 
