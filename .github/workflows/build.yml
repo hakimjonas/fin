@@ -90,5 +90,5 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: fin-${{ matrix.distro }}-${{ inputs.tag }}
+          name: fin-${{ matrix.distro }}-${{ github.ref_name }}
           path: ${{ matrix.artifact_path }}
