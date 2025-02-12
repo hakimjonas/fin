@@ -40,6 +40,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Sync Version and Update Artifacts**
+        run: ./sync-version.sh
+
       - name: Cache dependencies
         uses: actions/cache@v3
         with:
