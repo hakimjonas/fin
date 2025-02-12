@@ -101,24 +101,22 @@ fn load_config(path: &Path) -> Result<Config> {
 
 /// Returns the command set appropriate for the given desktop environment.
 fn get_commands_for_de(de: &str, config: &Config) -> Vector<ButtonConfig> {
-    if let Some(cmds) = config.de_overrides.get(de).filter(|cmds| !cmds.is_empty()) {
-        return cmds.clone();
+    match (
+        config.de_overrides.get(de).filter(|cmds| !cmds.is_empty()),
+        config
+            .default_commands
+            .get(de)
+            .filter(|cmds| !cmds.is_empty()),
+        config
+            .default_commands
+            .get("default")
+            .filter(|cmds| !cmds.is_empty()),
+    ) {
+        (Some(cmds), _, _) => cmds.clone(),
+        (None, Some(cmds), _) => cmds.clone(),
+        (None, None, Some(cmds)) => cmds.clone(),
+        _ => config.buttons.clone(),
     }
-    if let Some(cmds) = config
-        .default_commands
-        .get(de)
-        .filter(|cmds| !cmds.is_empty())
-    {
-        return cmds.clone();
-    }
-    if let Some(cmds) = config
-        .default_commands
-        .get("default")
-        .filter(|cmds| !cmds.is_empty())
-    {
-        return cmds.clone();
-    }
-    config.buttons.clone()
 }
 
 /// Calculates the grid layout as a nested vector of button indices.
@@ -278,7 +276,7 @@ fn select_css_path(
     }
 }
 
-/// Loads the CSS file. If use_system_theme is true, always loads a basic system fallback CSS.
+/// Loads the CSS file.
 fn load_css(path: &Path, use_system_theme: bool) -> Result<()> {
     let provider = CssProvider::new();
     if use_system_theme {
@@ -530,7 +528,6 @@ fn main() -> Result<()> {
     let commands = get_commands_for_de(&de, &config);
     let default_css = PathBuf::from("/usr/share/fin/style.css");
 
-    // If use_system_theme is true, ignore any CSS file and use system fallback.
     let stylesheet_path = if config.use_system_theme {
         info!("use_system_theme is true; system theme will be used.");
         default_css.clone() // dummy value; load_css will load the system fallback CSS.
