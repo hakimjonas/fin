@@ -10,10 +10,12 @@ jobs:
   build_and_package:
     name: Build Packages
     uses: ./.github/workflows/build.yml
+    with:
+      tag: ${{ github.ref_name }}
 
   release:
     name: Publish Release
-    needs: [build_and_package]
+    needs: [ build_and_package ]
     runs-on: ubuntu-latest
     permissions:
       contents: write
