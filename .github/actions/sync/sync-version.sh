@@ -3,21 +3,29 @@ set -e
 
 echo "🔄 Syncing Version and Updating Build Artifacts..."
 
-# If TAG is provided as an environment variable, use that.
+# 1. Use the provided TAG environment variable if available.
 if [[ -n "$TAG" ]]; then
   TAG_VERSION="$TAG"
-# Otherwise, if a .git directory exists, try to extract the version from git.
+# 2. Otherwise, if a .git directory is available, try to get the latest tag.
 elif [ -d ".git" ]; then
-  TAG_VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')
-else
-  echo "❌ No Git tag found and no input tag provided."
-  echo "Please tag a release first using: git tag vX.Y.Z or pass the version using the 'tag' input."
+  # Suppress errors if no tag is found.
+  TAG_VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
+fi
+
+# 3. If TAG_VERSION is still empty, use a default version.
+if [[ -z "$TAG_VERSION" ]]; then
+  TAG_VERSION="0.2.0"
+  echo "No tag provided or found; falling back to default version: $TAG_VERSION"
+fi
+
+# 4. Validate that the version is a valid semantic version (e.g. 0.2.0).
+if ! [[ "$TAG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "❌ Invalid version format: '$TAG_VERSION'. Expected a semantic version (e.g., 0.2.0)."
   exit 1
 fi
 
 echo "📌 Using version: $TAG_VERSION"
 
-# Step 2: Ensure Cargo.toml is updated to match the Git tag
 echo "📦 Updating Cargo.toml..."
 cargo install cargo-edit --debug || true  # Install cargo-edit if missing
 cargo set-version "$TAG_VERSION"
