@@ -4,9 +4,17 @@ on:
   workflow_call:
     inputs:
       tag:
+        description: 'Semantic version (e.g., 0.2.0). Leave blank to use Git tag fallback.'
         required: false
         type: string
+        default: ""
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Semantic version (e.g., 0.2.0). Leave blank to use Git tag fallback.'
+        required: false
+        type: string
+        default: ""
 
 jobs:
   build:
