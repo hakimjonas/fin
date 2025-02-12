@@ -42,7 +42,7 @@ jobs:
         with:
           fetch-depth: 0  # Ensure full history & tags are available
           persist-credentials: false  # Ensure a clean clone inside the container
-
+          sparse-checkout: false  # Ensure all files are available
       # ✅ Ensure Git is installed first!
       - name: Install system dependencies (including Git)
         run: |
