@@ -19,6 +19,7 @@ use gtk4::{
 use im::{vector, HashMap, Vector};
 use log::{error, info};
 use serde::Deserialize;
+use std::path::PathBuf;
 use std::{cell::Cell, env, fs, path::Path, process::Command as ProcessCommand, rc::Rc};
 
 /// Default number of columns to use if none is specified.
@@ -212,9 +213,24 @@ fn main() -> Result<()> {
 
     let config_path = matches
         .get_one::<String>("config")
-        .map(|s| s.as_str())
-        .unwrap_or("/usr/share/fin/config.toml");
-    let config = load_config(Path::new(config_path))?;
+        .map(|s| s.as_str().to_string())
+        .unwrap_or_else(|| {
+            env::var_os("XDG_CONFIG_HOME")
+                .map(PathBuf::from)
+                .or_else(|| {
+                    env::var_os("HOME").map(|home| {
+                        PathBuf::from(home)
+                            .join(".config")
+                            .join("fin")
+                            .join("config.toml")
+                    })
+                })
+                .filter(|path| path.exists() && path.is_file())
+                .and_then(|path| path.to_str().map(|s| s.to_string()))
+                .unwrap_or_else(|| "/usr/share/fin/config.toml".to_string())
+        });
+
+    let config = load_config(Path::new(&config_path))?;
     let de = detect_desktop_environment();
     let commands = get_commands_for_de(&de, &config);
     let stylesheet_path = Path::new("/usr/share/fin/style.css");
@@ -368,14 +384,15 @@ fn setup_focus_controller(window: &ApplicationWindow, app: &Application) {
 /// Loads CSS styling from the specified file unless the system theme is used.
 fn load_css(path: &Path, use_system_theme: bool) -> Result<()> {
     let provider = CssProvider::new();
-    if !use_system_theme && path.exists() {
+    if path.exists() {
         let css_data = fs::read(path)
             .with_context(|| format!("Could not read CSS file '{}'", path.display()))?;
         let css_str = std::str::from_utf8(&css_data)
             .with_context(|| format!("CSS file '{}' is not valid UTF-8", path.display()))?;
         provider.load_from_string(css_str);
-    } else {
+    } else if use_system_theme {
         info!("Using system GTK4 theme");
+        provider.load_from_string("button { font-size: 72px; }");
     }
     let display = Display::default().ok_or_else(|| anyhow!("Could not get default display"))?;
     gtk4::style_context_add_provider_for_display(
