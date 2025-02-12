@@ -40,7 +40,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Ensure all history & tags are available
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Ensure Git Repository Exists (for Containers)
+        run: |
+          git config --global --add safe.directory $(pwd)
+          git init
+          git remote add origin https://github.com/${{ github.repository }}.git
+          git fetch --tags
+          git checkout ${{ github.ref_name }}
 
       - name: Install system dependencies (including Git)
         run: |
