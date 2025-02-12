@@ -43,6 +43,12 @@ jobs:
           fetch-depth: 0  # Ensure full history & tags are available
           persist-credentials: false  # Ensure a clean clone inside the container
           sparse-checkout: false  # Ensure all files are available
+      - name: Verify GitHub Actions Sync Directory
+        run: |
+          echo "Current Directory: $(pwd)"
+          echo "Checking .github/actions/sync:"
+          ls -la .github/actions/sync || echo "Sync action directory missing!"
+          find . -name "action.yml" || echo "action.yml not found!"
 
       - name: Install system dependencies (including Git)
         run: |
