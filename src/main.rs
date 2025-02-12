@@ -54,7 +54,7 @@ struct Config {
     /// Flag to indicate whether to use the system GTK theme.
     use_system_theme: bool,
     /// Path to the CSS stylesheet.
-    #[serde(default)]
+    #[serde(default, alias = "stylesheet")]
     css_path: Option<String>,
     /// Desktop environment specific button overrides.
     #[serde(default)]
@@ -515,15 +515,12 @@ fn setup_key_handlers(
     }
     window.add_controller(controller);
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use im::hashmap;
     use std::fs;
     use std::path::PathBuf;
-
-    // Existing tests ...
 
     #[test]
     fn load_config_valid_file() {
@@ -634,16 +631,6 @@ mod tests {
     }
 
     // --- New tests for load_css functionality ---
-
-    /// Helper function to skip tests if no default display is available.
-    fn skip_if_no_display() {
-        if Display::default().is_none() {
-            eprintln!("Skipping test because no default display found");
-            // Using panic! here would fail the test, so we simply return.
-            // Alternatively, you can use #[ignore] on tests requiring a display.
-            return;
-        }
-    }
 
     #[test]
     fn test_load_css_file_exists() -> Result<()> {
