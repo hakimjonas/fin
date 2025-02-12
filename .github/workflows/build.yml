@@ -35,6 +35,9 @@ jobs:
     container:
       image: ${{ matrix.container }}
       options: --entrypoint ""
+    env:
+      # Pass the input tag to the container as an environment variable
+      TAG: ${{ inputs.tag }}
 
     steps:
       - name: Checkout repository

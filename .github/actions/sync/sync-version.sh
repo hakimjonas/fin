@@ -3,14 +3,17 @@ set -e
 
 echo "🔄 Syncing Version and Updating Build Artifacts..."
 
-# Step 1: Extract the latest Git tag (e.g., "v0.2.0") and remove the "v" prefix
-TAG_VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')
-
-if [[ -z "$TAG_VERSION" ]]; then
-    echo "❌ No Git tag found. Please tag a release first using: git tag vX.Y.Z"
-    exit 1
+# If TAG is provided as an environment variable, use that.
+if [[ -n "$TAG" ]]; then
+  TAG_VERSION="$TAG"
+# Otherwise, if a .git directory exists, try to extract the version from git.
+elif [ -d ".git" ]; then
+  TAG_VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')
+else
+  echo "❌ No Git tag found and no input tag provided."
+  echo "Please tag a release first using: git tag vX.Y.Z or pass the version using the 'tag' input."
+  exit 1
 fi
-
 
 echo "📌 Using version: $TAG_VERSION"
 
