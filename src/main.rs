@@ -1,4 +1,3 @@
-//! # Finë Logout Manager
 //!
 //! A GTK4-based logout manager for Finë. This application reads its configuration
 //! from a TOML file, creates a grid-based UI with buttons for various commands, and supports
@@ -19,8 +18,12 @@ use gtk4::{
 use im::{vector, HashMap, Vector};
 use log::{error, info};
 use serde::Deserialize;
-use std::path::PathBuf;
-use std::{cell::Cell, env, fs, path::Path, process::Command as ProcessCommand, rc::Rc};
+use std::cell::Cell;
+use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command as ProcessCommand;
+use std::rc::Rc;
 
 /// Default number of columns to use if none is specified.
 fn default_columns() -> usize {
@@ -50,6 +53,9 @@ struct Config {
     buttons: Vector<ButtonConfig>,
     /// Flag to indicate whether to use the system GTK theme.
     use_system_theme: bool,
+    /// Path to the CSS stylesheet.
+    #[serde(default)]
+    css_path: Option<String>,
     /// Desktop environment specific button overrides.
     #[serde(default)]
     de_overrides: HashMap<String, Vector<ButtonConfig>>,
@@ -233,14 +239,27 @@ fn main() -> Result<()> {
     let config = load_config(Path::new(&config_path))?;
     let de = detect_desktop_environment();
     let commands = get_commands_for_de(&de, &config);
-    let stylesheet_path = Path::new("/usr/share/fin/style.css");
+
+    // Distinguish between a user-defined CSS file and a default one.
+    let (stylesheet_path, user_defined_css) = if let Some(css_path) = config.css_path.clone() {
+        (PathBuf::from(css_path), true)
+    } else {
+        (PathBuf::from("/usr/share/fin/style.css"), false)
+    };
 
     let app = Application::builder()
         .application_id("com.fin.launcher")
         .build();
 
+    let config_clone = config.clone();
     app.connect_activate(move |app| {
-        if let Err(e) = build_ui(app, &config, stylesheet_path, &commands) {
+        if let Err(e) = build_ui(
+            app,
+            &config_clone,
+            &stylesheet_path,
+            user_defined_css,
+            &commands,
+        ) {
             error!("Error building UI: {:?}", e);
             std::process::exit(1);
         }
@@ -282,6 +301,7 @@ fn build_ui(
     app: &Application,
     config: &Config,
     stylesheet_path: &Path,
+    user_defined_css: bool,
     buttons: &Vector<ButtonConfig>,
 ) -> Result<()> {
     if config.columns == 0 {
@@ -308,7 +328,7 @@ fn build_ui(
     // Set a tooltip to describe the window (for accessibility).
     window.set_tooltip_text(Some("Finë logout manager window"));
 
-    load_css(stylesheet_path, config.use_system_theme)?;
+    load_css(stylesheet_path, config.use_system_theme, user_defined_css)?;
 
     let grid = create_grid();
     grid.set_tooltip_text(Some("Button grid"));
@@ -381,8 +401,10 @@ fn setup_focus_controller(window: &ApplicationWindow, app: &Application) {
     window.add_controller(focus_controller);
 }
 
-/// Loads CSS styling from the specified file unless the system theme is used.
-fn load_css(path: &Path, use_system_theme: bool) -> Result<()> {
+/// Loads the CSS from the given path. If the file exists, it loads that file. If it does not
+/// exist and no user-defined CSS was requested, it falls back to the system theme (if enabled).
+/// If a user-defined CSS was expected but not found, an error is returned.
+fn load_css(path: &Path, use_system_theme: bool, user_defined_css: bool) -> Result<()> {
     let provider = CssProvider::new();
     if path.exists() {
         let css_data = fs::read(path)
@@ -390,9 +412,15 @@ fn load_css(path: &Path, use_system_theme: bool) -> Result<()> {
         let css_str = std::str::from_utf8(&css_data)
             .with_context(|| format!("CSS file '{}' is not valid UTF-8", path.display()))?;
         provider.load_from_string(css_str);
-    } else if use_system_theme {
-        info!("Using system GTK4 theme");
+        info!("Loaded CSS from '{}'", path.display());
+    } else if !user_defined_css && use_system_theme {
+        info!(
+            "CSS file '{}' not found; using system GTK4 theme",
+            path.display()
+        );
         provider.load_from_string("button { font-size: 72px; }");
+    } else {
+        return Err(anyhow!("CSS file '{}' does not exist", path.display()));
     }
     let display = Display::default().ok_or_else(|| anyhow!("Could not get default display"))?;
     gtk4::style_context_add_provider_for_display(
@@ -487,11 +515,15 @@ fn setup_key_handlers(
     }
     window.add_controller(controller);
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use im::hashmap;
+    use std::fs;
     use std::path::PathBuf;
+
+    // Existing tests ...
 
     #[test]
     fn load_config_valid_file() {
@@ -572,6 +604,7 @@ mod tests {
             columns: 1,
             buttons: vector![],
             use_system_theme: false,
+            css_path: None,
             de_overrides: hashmap! {
                 "test_de".to_string() => vector![ButtonConfig { label: "Override".to_string(), command: "echo override".to_string() }]
             },
@@ -589,6 +622,7 @@ mod tests {
             columns: 1,
             buttons: vector![],
             use_system_theme: false,
+            css_path: None,
             de_overrides: hashmap! {},
             default_commands: hashmap! {
                 "default".to_string() => vector![ButtonConfig { label: "Default".to_string(), command: "echo default".to_string() }]
@@ -597,5 +631,73 @@ mod tests {
         let commands = get_commands_for_de("unknown_de", &config);
         assert_eq!(commands.len(), 1);
         assert_eq!(commands[0].label, "Default");
+    }
+
+    // --- New tests for load_css functionality ---
+
+    /// Helper function to skip tests if no default display is available.
+    fn skip_if_no_display() {
+        if Display::default().is_none() {
+            eprintln!("Skipping test because no default display found");
+            // Using panic! here would fail the test, so we simply return.
+            // Alternatively, you can use #[ignore] on tests requiring a display.
+            return;
+        }
+    }
+
+    #[test]
+    fn test_load_css_file_exists() -> Result<()> {
+        // Skip test if no display is available.
+        if Display::default().is_none() {
+            eprintln!("Skipping test_load_css_file_exists because no default display found");
+            return Ok(());
+        }
+        let tmp_dir = env::temp_dir();
+        let css_path = tmp_dir.join("test_style.css");
+        fs::write(&css_path, "button { background: blue; }")?;
+        let res = load_css(&css_path, false, true); // user_defined_css = true
+        fs::remove_file(&css_path)?;
+        assert!(res.is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_css_user_defined_missing() -> Result<()> {
+        if Display::default().is_none() {
+            eprintln!(
+                "Skipping test_load_css_user_defined_missing because no default display found"
+            );
+            return Ok(());
+        }
+        let missing_path = PathBuf::from("this_file_should_not_exist.css");
+        let res = load_css(&missing_path, false, true); // user_defined_css = true, file missing
+        assert!(res.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_css_system_theme_fallback() -> Result<()> {
+        if Display::default().is_none() {
+            eprintln!(
+                "Skipping test_load_css_system_theme_fallback because no default display found"
+            );
+            return Ok(());
+        }
+        let missing_path = PathBuf::from("this_file_should_not_exist.css");
+        let res = load_css(&missing_path, true, false); // use_system_theme = true, user_defined_css = false
+        assert!(res.is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_css_no_fallback() -> Result<()> {
+        if Display::default().is_none() {
+            eprintln!("Skipping test_load_css_no_fallback because no default display found");
+            return Ok(());
+        }
+        let missing_path = PathBuf::from("this_file_should_not_exist.css");
+        let res = load_css(&missing_path, false, false); // use_system_theme = false, user_defined_css = false
+        assert!(res.is_err());
+        Ok(())
     }
 }
