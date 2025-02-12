@@ -86,7 +86,7 @@ jobs:
         run: git --version  # Ensures Git is available in the container
 
       - name: Sync Version and Update Artifacts
-        run: ./sync-version.sh
+        run: bash $GITHUB_WORKSPACE/sync-version.sh
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
