@@ -40,16 +40,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Ensure full history & tags are available
-          persist-credentials: false  # Ensure a clean clone inside the container
-          sparse-checkout: false  # Ensure all files are available
+          fetch-depth: 0
+          persist-credentials: false
+          # Remove sparse-checkout: false (not needed as it's the default)
+
       - name: Verify GitHub Actions Sync Directory
         run: |
           echo "Current Directory: $(pwd)"
           echo "Checking .github/actions/sync:"
           ls -la .github/actions/sync || echo "Sync action directory missing!"
           find . -name "action.yml" || echo "action.yml not found!"
-
       - name: Install system dependencies (including Git)
         run: |
           case "${{ matrix.distro }}" in
@@ -67,17 +67,6 @@ jobs:
               apt-get update && apt-get install -y curl build-essential pkg-config libglib2.0-dev libgtk-4-dev git
               ;;
           esac
-
-      - name: Ensure Git Repository Exists (for Containers)
-        run: |
-          git config --global --add safe.directory $(pwd)
-          git init
-          git remote add origin https://github.com/${{ github.repository }}.git
-          git fetch --tags
-          git fetch origin ${{ github.ref_name }}  # Ensure we fetch the branch
-          git reset --hard origin/${{ github.ref_name }}  # Reset all untracked changes
-          git clean -fdx  # Remove untracked files and directories
-          git checkout ${{ github.ref_name }}  # Explicitly checkout the branch
 
       - name: Sync Version
         uses: ./.github/actions/sync  # Calls the reusable action
