@@ -1,0 +1,7 @@
+name: "Sync Version"
+description: "Syncs versioning in build pipelines"
+runs:
+  using: "composite"
+  steps:
+    - run: bash ${{ github.action_path }}/sync-version.sh
+      shell: bash

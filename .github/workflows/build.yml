@@ -1,12 +1,23 @@
 name: Build and Package
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_call:
     inputs:
       tag:
+        description: 'Semantic version (e.g., 0.2.0). Leave blank to use Git tag fallback.'
         required: false
         type: string
+        default: ""
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Semantic version (e.g., 0.2.0). Leave blank to use Git tag fallback.'
+        required: false
+        type: string
+        default: ""
 
 jobs:
   build:
@@ -35,40 +46,66 @@ jobs:
     container:
       image: ${{ matrix.container }}
       options: --entrypoint ""
+    env:
+      # Pass the workflow input (if any) into the script.
+      TAG: ${{ inputs.tag }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Cache dependencies
-        uses: actions/cache@v3
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
 
-      - name: Install system dependencies
+      - name: Validate tag input
+        if: inputs.tag != ''
+        shell: bash
+        run: |
+          # Check if the input tag matches semantic versioning pattern (with optional 'v' prefix)
+          if [[ ! "${{ inputs.tag }}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?(\+[a-zA-Z0-9]+)?$ ]]; then
+            echo "❌ Invalid semantic version provided: ${{ inputs.tag }}"
+            echo "Please use the format 'X.Y.Z' or 'vX.Y.Z' (with optional pre-release/build metadata)."
+            exit 1
+          fi
+
+      - name: Verify GitHub Actions Sync Directory
+        run: |
+          echo "Current Directory: $(pwd)"
+          echo "Checking .github/actions/sync:"
+          ls -la .github/actions/sync || echo "Sync action directory missing!"
+          find . -name "action.yml" || echo "action.yml not found!"
+
+
+      - name: Install system dependencies (including Git)
         run: |
           case "${{ matrix.distro }}" in
             ubuntu)
-              apt-get update && apt-get install -y curl libgtk-4-dev build-essential pkg-config
+              apt-get update && apt-get install -y curl libgtk-4-dev build-essential pkg-config git
               ;;
             arch)
-              pacman -Syu --noconfirm curl gtk4 base-devel pkgconf
+              pacman -Syu --noconfirm curl gtk4 base-devel pkgconf git
               ;;
             solus)
               eopkg up -y
-              eopkg it -y curl libgtk-4-devel gcc
+              eopkg it -y curl libgtk-4-devel gcc git
               ;;
             nix)
-              apt-get update && apt-get install -y curl build-essential pkg-config libglib2.0-dev libgtk-4-dev
+              apt-get update && apt-get install -y curl build-essential pkg-config libglib2.0-dev libgtk-4-dev git
               ;;
           esac
 
+      # Install Rust (and Cargo) so they're available for the sync script and subsequent steps.
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Ensure sync-version script is executable
+        run: chmod +x ./.github/actions/sync/sync-version.sh
+        shell: bash
+
+      - name: Sync Version
+        run: ./.github/actions/sync/sync-version.sh
+        shell: bash
 
       - name: Install cargo-make
         run: cargo install cargo-make
@@ -90,5 +127,5 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: fin-${{ matrix.distro }}
+          name: fin-${{ matrix.distro }}-${{ github.ref_name }}
           path: ${{ matrix.artifact_path }}

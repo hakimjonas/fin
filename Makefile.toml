@@ -136,18 +136,17 @@ script = [
 ]
 
 [tasks.package-nix]
-description = "Package Finë for Nix as a tarball (including default.nix if available)"
+description = "Package Finë for Nix as a tarball (including flake.nix if available)"
 script = [
     "echo 'Packaging for Nix...'",
     "rm -rf target/package/nix",
     "mkdir -p target/package/nix/fin",
     "cp target/release/fin target/package/nix/fin/",
     "cp -r assets target/package/nix/fin/",
-    "if [ -f default.nix ]; then cp default.nix target/package/nix/fin/; else echo 'Warning: No default.nix file found.'; fi",
+    "if [ -f flake.nix ]; then cp flake.nix target/package/nix/fin/; else echo 'Warning: No flake.nix file found.'; fi",
     "tar -czvf target/fin-${VERSION}-nix.tar.gz -C target/package/nix fin",
     "echo 'Nix package created: target/fin-${VERSION}-nix.tar.gz'"
 ]
-
 [tasks.package]
 description = "Package Finë for distribution (Debian, Solus, Arch, and Nix)"
 dependencies = [
