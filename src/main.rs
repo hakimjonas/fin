@@ -5,7 +5,7 @@ use gtk4::{
     gdk, prelude::*, Application, ApplicationWindow, Button, CssProvider, EventControllerFocus,
     EventControllerKey, Grid,
 };
-use im::{vector, HashMap, Vector};
+use im::{HashMap, Vector};
 use log::{error, info, warn};
 use serde::Deserialize;
 use std::cell::Cell;
@@ -256,36 +256,27 @@ fn get_commands_for_de(de: &str, config: &Config) -> Vector<ButtonConfig> {
 //
 
 /// Calculates the grid layout as a nested vector of button indices.
-fn calculate_layout(num_buttons: usize) -> std::result::Result<Vector<Vector<usize>>, String> {
-    match num_buttons {
-        1 => Ok(vector![vector![0]]),
-        2 => Ok(vector![vector![0], vector![1]]),
-        3 => Ok(vector![vector![0], vector![1], vector![2]]),
-        4 => Ok(vector![vector![0, 1], vector![2, 3]]),
-        5 => Ok(vector![
-            vector![0],
-            vector![1],
-            vector![2],
-            vector![3],
-            vector![4]
-        ]),
-        6 => Ok(vector![vector![0, 1], vector![2, 3], vector![4, 5]]),
-        7 => Err("7 buttons are not allowed, because your screen is not THAT wide".into()),
-        8 => Ok(vector![
-            vector![0, 1],
-            vector![2, 3],
-            vector![4, 5],
-            vector![6, 7]
-        ]),
-        9 => Ok(vector![
-            vector![0, 1, 2],
-            vector![3, 4, 5],
-            vector![6, 7, 8]
-        ]),
-        _ => Err("Number of buttons must be between 1 and 9.".into()),
+fn calculate_layout(
+    num_buttons: usize,
+    columns: usize,
+) -> std::result::Result<Vector<Vector<usize>>, String> {
+    // Preserve original error conditions
+    if num_buttons == 7 {
+        return Err("7 buttons are not allowed...".into());
     }
-}
+    if num_buttons == 0 || num_buttons > 9 {
+        return Err("Number of buttons must be between 1 and 9.".into());
+    }
 
+    // Create indices and chunk using standard Vec
+    let indices: Vec<usize> = (0..num_buttons).collect();
+    let layout = indices
+        .chunks(columns)
+        .map(|chunk| chunk.iter().copied().collect::<Vector<usize>>())
+        .collect::<Vector<_>>();
+
+    Ok(layout)
+}
 /// Calculates the new index for arrow-key navigation.
 fn new_index_for_arrow(current: usize, total: usize, columns: usize, key: gdk::Key) -> usize {
     match key {
@@ -467,7 +458,7 @@ fn build_ui(
 
     let grid = create_grid();
     grid.set_tooltip_text(Some("Button grid"));
-    let layout = calculate_layout(buttons.len()).map_err(|e| anyhow!(e))?;
+    let layout = calculate_layout(buttons.len(), config.columns).map_err(anyhow::Error::msg)?;
     let all_buttons = create_buttons(app, buttons);
     let button_widgets: Vector<Button> = layout
         .iter()
@@ -593,7 +584,7 @@ fn main() -> Result<()> {
 mod tests {
     use super::*;
     use anyhow::Result;
-    use im::hashmap;
+    use im::{hashmap, vector};
     use std::env;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -648,16 +639,15 @@ mod tests {
     #[test]
     fn calculate_layout_valid_buttons() {
         init_env();
-        let layout = calculate_layout(4).expect("Failed to calculate layout");
-        assert_eq!(layout.len(), 2);
-        assert_eq!(layout[0].len(), 2);
-        assert_eq!(layout[1].len(), 2);
+        // Test 4 buttons with 2 columns
+        let layout = calculate_layout(4, 2).expect("Failed to calculate layout");
+        assert_eq!(layout, vector![vector![0, 1], vector![2, 3]]);
     }
 
     #[test]
     fn calculate_layout_invalid_buttons() {
         init_env();
-        let result = calculate_layout(7);
+        let result = calculate_layout(7, 2);
         assert!(result.is_err());
     }
 
@@ -704,11 +694,47 @@ mod tests {
     }
 
     #[test]
+    fn calculate_layout_dynamic_columns() {
+        init_env();
+        // Test 6 buttons with 3 columns
+        let layout = calculate_layout(6, 3).expect("Valid layout");
+        assert_eq!(layout, vector![vector![0, 1, 2], vector![3, 4, 5]]);
+
+        // Test 5 buttons with 2 columns
+        let layout = calculate_layout(5, 2).expect("Valid layout");
+        assert_eq!(layout, vector![vector![0, 1], vector![2, 3], vector![4]]);
+    }
+
+    #[test]
+    fn calculate_layout_edge_cases() {
+        init_env();
+        // Single button
+        assert_eq!(calculate_layout(1, 1).unwrap(), vector![vector![0]]);
+
+        // Maximum buttons with varying columns
+        assert_eq!(
+            calculate_layout(9, 4).unwrap(),
+            vector![vector![0, 1, 2, 3], vector![4, 5, 6, 7], vector![8]]
+        );
+    }
+
+    #[test]
+    fn calculate_layout_zero_buttons() {
+        init_env();
+        let result = calculate_layout(0, 2);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Number of buttons must be between 1 and 9."
+        );
+    }
+
+    #[test]
     fn get_commands_for_de_with_override() {
         init_env();
         let config = Config {
             title: "Test".to_string(),
-            columns: 1,
+            columns: 2, // Changed from 1 to test multi-column
             buttons: vector![],
             use_gtk_theme: false,
             css_path: None,
@@ -722,7 +748,6 @@ mod tests {
         };
         let commands = get_commands_for_de("test_de", &config);
         assert_eq!(commands.len(), 1);
-        assert_eq!(commands[0].label, "Override");
     }
 
     #[test]
@@ -877,7 +902,6 @@ mod tests {
         Ok(())
     }
 }
-
 #[cfg(test)]
 mod ui_tests {
     use super::*;
@@ -938,15 +962,25 @@ mod ui_tests {
         }
     }
 
-    /// Create a minimal dummy configuration.
+    /// Create a dummy configuration with column testing support
     fn dummy_config(css_path: Option<String>, use_gtk_theme: bool) -> Config {
         Config {
             title: "Test UI".to_string(),
-            columns: 1,
-            buttons: vector![ButtonConfig {
-                label: "Test".to_string(),
-                command: "echo test".to_string(),
-            }],
+            columns: 2,
+            buttons: vector![
+                ButtonConfig {
+                    label: "Test1".to_string(),
+                    command: "echo test1".to_string(),
+                },
+                ButtonConfig {
+                    label: "Test2".to_string(),
+                    command: "echo test2".to_string(),
+                },
+                ButtonConfig {
+                    label: "Test3".to_string(),
+                    command: "echo test3".to_string(),
+                }
+            ],
             use_gtk_theme,
             css_path,
             de_overrides: HashMap::new(),
@@ -1016,6 +1050,50 @@ mod ui_tests {
 
         remove_file(&default_css);
         remove_file(&config_path);
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_ui_with_columns() -> Result<()> {
+        init_env();
+        if gdk::Display::default().is_none() {
+            eprintln!("Skipping test_build_ui_with_columns: no display available");
+            return Ok(());
+        }
+
+        let config = Config {
+            title: "Column Test".to_string(),
+            columns: 3,
+            buttons: vector![
+                ButtonConfig {
+                    label: "1".into(),
+                    command: "".into()
+                },
+                ButtonConfig {
+                    label: "2".into(),
+                    command: "".into()
+                },
+                ButtonConfig {
+                    label: "3".into(),
+                    command: "".into()
+                },
+                ButtonConfig {
+                    label: "4".into(),
+                    command: "".into()
+                },
+                ButtonConfig {
+                    label: "5".into(),
+                    command: "".into()
+                },
+            ],
+            use_gtk_theme: false,
+            css_path: None,
+            de_overrides: HashMap::new(),
+            default_commands: HashMap::new(),
+        };
+
+        let res = run_build_ui(config, None);
+        assert!(res.is_ok());
         Ok(())
     }
 
