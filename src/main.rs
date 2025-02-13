@@ -622,21 +622,6 @@ mod tests {
     }
 
     #[test]
-    fn calculate_layout_valid_buttons() {
-        init_env();
-        // Test 4 buttons with 2 columns
-        let layout = calculate_layout(4, 2).expect("Failed to calculate layout");
-        assert_eq!(layout, vector![vector![0, 1], vector![2, 3]]);
-    }
-
-    #[test]
-    fn calculate_layout_invalid_buttons() {
-        init_env();
-        let result = calculate_layout(7, 2);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn new_index_for_arrow_up() {
         init_env();
         let index = new_index_for_arrow(3, 6, 2, gdk::Key::Up);
@@ -679,39 +664,34 @@ mod tests {
     }
 
     #[test]
-    fn calculate_layout_dynamic_columns() {
+    fn get_commands_for_de_with_default() {
         init_env();
-        // Test 6 buttons with 3 columns
-        let layout = calculate_layout(6, 3).expect("Valid layout");
-        assert_eq!(layout, vector![vector![0, 1, 2], vector![3, 4, 5]]);
+        let config = Config {
+            title: "Test".to_string(),
+            columns: 1, // Base config columns (should be overridden)
+            buttons: vector![],
+            use_gtk_theme: false,
+            css_path: None,
+            de_overrides: hashmap! {},
+            default_commands: hashmap! {
+                "default".to_string() => DECommands {
+                    columns: 2,
+                    buttons: vector![
+                        ButtonConfig {
+                            label: "Default".to_string(),
+                            command: "echo default".to_string()
+                        }
+                    ]
+                }
+            },
+        };
 
-        // Test 5 buttons with 2 columns
-        let layout = calculate_layout(5, 2).expect("Valid layout");
-        assert_eq!(layout, vector![vector![0, 1], vector![2, 3], vector![4]]);
-    }
+        let (commands, columns) = get_commands_for_de("unknown_de", &config);
 
-    #[test]
-    fn calculate_layout_edge_cases() {
-        init_env();
-        // Single button
-        assert_eq!(calculate_layout(1, 1).unwrap(), vector![vector![0]]);
-
-        // Maximum buttons with varying columns
-        assert_eq!(
-            calculate_layout(9, 4).unwrap(),
-            vector![vector![0, 1, 2, 3], vector![4, 5, 6, 7], vector![8]]
-        );
-    }
-
-    #[test]
-    fn calculate_layout_zero_buttons() {
-        init_env();
-        let result = calculate_layout(0, 2);
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err(),
-            "Number of buttons must be between 1 and 9."
-        );
+        // Verify both commands and columns
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0].label, "Default");
+        assert_eq!(columns, 2); // Should use default command's columns
     }
 
     #[test]
@@ -731,30 +711,9 @@ mod tests {
             },
             default_commands: hashmap! {},
         };
-        let commands = get_commands_for_de("test_de", &config);
+        let (commands, columns) = get_commands_for_de("test_de", &config);
         assert_eq!(commands.len(), 1);
-    }
-
-    #[test]
-    fn get_commands_for_de_with_default() {
-        init_env();
-        let config = Config {
-            title: "Test".to_string(),
-            columns: 1,
-            buttons: vector![],
-            use_gtk_theme: false,
-            css_path: None,
-            de_overrides: hashmap! {},
-            default_commands: hashmap! {
-                "default".to_string() => vector![ButtonConfig {
-                    label: "Default".to_string(),
-                    command: "echo default".to_string()
-                }]
-            },
-        };
-        let commands = get_commands_for_de("unknown_de", &config);
-        assert_eq!(commands.len(), 1);
-        assert_eq!(commands[0].label, "Default");
+        assert_eq!(columns, 2);
     }
 
     #[test]
