@@ -5,65 +5,71 @@ stylesheet = "style.css"
 use_gtk_theme = false
 
 [default_commands]
-# GNOME
-gnome = [
+
+[default_commands.gnome]
+buttons = [
     { label = "󰌾", command = "xdg-screensaver lock" },
     { label = "󰍃", command = "gnome-session-quit --logout" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
+    { label = "󰜉", command = "systemctl reboot -i" },
+    { label = "󰐥", command = "systemctl poweroff -i" }
 ]
 
-# Hyprland
-hyprland = [
-    { label = "󰌾", command = "hyprctl dispatch exec hyprlock" },
-    { label = "󰍃", command = "loginctl terminate-user $USER" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
+[default_commands.hyprland]
+columns = 2  # Hyprland-specific column count
+buttons = [
+    { label = "󰌾", command = "hyprlock" },
+    { label = "󰍃", command = "hyprctl dispatch exit" },
+    { label = "󰜉", command = "systemctl reboot --firmware-setup" },
+    { label = "󰐥", command = "systemctl poweroff --hybrid" }
 ]
 
-# Budgie
-budgie = [
-    { label = "󰌾", command = "xdg-screensaver lock" },
+[default_commands.budgie]
+buttons = [
+    { label = "󰌾", command = "budgie-screensaver lock" },
     { label = "󰍃", command = "budgie-session-quit --logout" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
+    { label = "󰜉", command = "systemctl reboot --message='Rebooting system...'" },
+    { label = "󰐥", command = "systemctl poweroff --message='Shutting down...'" }
 ]
 
-# XFCE
-xfce = [
+[default_commands.xfce]
+buttons = [
     { label = "󰌾", command = "xflock4" },
     { label = "󰍃", command = "xfce4-session-logout --logout" },
     { label = "󰜉", command = "systemctl reboot" },
     { label = "󰐥", command = "systemctl poweroff" }
 ]
 
-# i3 Window Manager
-i3 = [
-    { label = "󰌾", command = "i3lock" },
+[default_commands.i3]
+columns = 1  # Vertical stack layout
+buttons = [
+    { label = "󰌾", command = "i3lock -c 000000" },
     { label = "󰍃", command = "i3-msg exit" },
     { label = "󰜉", command = "systemctl reboot" },
     { label = "󰐥", command = "systemctl poweroff" }
 ]
 
-# Sway (Wayland i3 Equivalent)
-sway = [
-    { label = "󰌾", command = "swaylock" },
+[default_commands.sway]
+buttons = [
+    { label = "󰌾", command = "swaylock -f -c 000000" },
     { label = "󰍃", command = "swaymsg exit" },
+    { label = "󰜉", command = "systemctl reboot --firmware-setup" },
+    { label = "󰐥", command = "systemctl poweroff --hybrid" }
+]
+
+[default_commands.come]
+columns = 3  # Experimental 3-column layout
+buttons = [
+    { label = "󰤄", command = "system76-power suspend" },
+    { label = "󰌾", command = "loginctl lock-session" },
+    { label = "󰍃", command = "gnome-session-quit --logout" },
     { label = "󰜉", command = "systemctl reboot" },
     { label = "󰐥", command = "systemctl poweroff" }
 ]
 
-# COSMIC DE (Pop!_OS)
-cosmic = [
-    { label = "󰌾", command = "system76-power suspend" },
-    { label = "󰍃", command = "system76-power shutdown" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
-]
-
-# Default (Fallback for unknown DEs)
-default = [
-    { label = "󰌾", command = "xdg-screensaver lock" },
+[default_commands.default]
+columns = 1  # Fallback single-column layout
+buttons = [
+    { label = "󰌾", command = "loginctl lock-session" },
     { label = "󰜉", command = "systemctl reboot" },
     { label = "󰐥", command = "systemctl poweroff" }
 ]

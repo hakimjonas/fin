@@ -187,27 +187,27 @@ fn default_use_gtk_theme() -> bool {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-struct Config {
-    /// The title of the logout manager window.
-    title: String,
-    /// The number of columns in the UI grid.
+struct DECommands {
     #[serde(default = "default_columns")]
     columns: usize,
-    /// A list of button configurations.
+    buttons: Vector<ButtonConfig>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+struct Config {
+    title: String,
+    #[serde(default = "default_columns")]
+    columns: usize,
     #[serde(default, deserialize_with = "deserialize_vector")]
     buttons: Vector<ButtonConfig>,
-    /// Flag to indicate whether to use the system GTK theme.
     #[serde(default = "default_use_gtk_theme")]
     use_gtk_theme: bool,
-    /// Path to the CSS stylesheet (alias "stylesheet").
     #[serde(default, alias = "stylesheet")]
     css_path: Option<String>,
-    /// Desktop environment specific button overrides.
     #[serde(default)]
     de_overrides: HashMap<String, Vector<ButtonConfig>>,
-    /// Default button commands keyed by desktop environment.
     #[serde(default)]
-    default_commands: HashMap<String, Vector<ButtonConfig>>,
+    default_commands: HashMap<String, DECommands>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -231,23 +231,24 @@ fn load_config(path: &Path) -> Result<Config> {
     Ok(config)
 }
 
-/// Returns the command set appropriate for the given desktop environment.
-fn get_commands_for_de(de: &str, config: &Config) -> Vector<ButtonConfig> {
+/// Returns (commands, columns) for the given desktop environment
+fn get_commands_for_de(de: &str, config: &Config) -> (Vector<ButtonConfig>, usize) {
     match (
-        config.de_overrides.get(de).filter(|cmds| !cmds.is_empty()),
-        config
-            .default_commands
-            .get(de)
-            .filter(|cmds| !cmds.is_empty()),
-        config
-            .default_commands
-            .get("default")
-            .filter(|cmds| !cmds.is_empty()),
+        config.de_overrides.get(de).filter(|v| !v.is_empty()),
+        config.default_commands.get(de),
+        config.default_commands.get("default"),
     ) {
-        (Some(cmds), _, _) => cmds.clone(),
-        (None, Some(cmds), _) => cmds.clone(),
-        (None, None, Some(cmds)) => cmds.clone(),
-        _ => config.buttons.clone(),
+        // DE override takes priority
+        (Some(cmds), _, _) => (cmds.clone(), config.columns),
+
+        // DE-specific default commands
+        (None, Some(de_cmd), _) => (de_cmd.buttons.clone(), de_cmd.columns),
+
+        // Global default commands
+        (None, None, Some(default_cmd)) => (default_cmd.buttons.clone(), default_cmd.columns),
+
+        // Fallback to base config
+        _ => (config.buttons.clone(), config.columns),
     }
 }
 
@@ -255,28 +256,36 @@ fn get_commands_for_de(de: &str, config: &Config) -> Vector<ButtonConfig> {
 // 3. UI and Navigation Functions
 //
 
-/// Calculates the grid layout as a nested vector of button indices.
-fn calculate_layout(
-    num_buttons: usize,
+/// Composes UI elements in a declarative grid layout
+fn compose_grid(
+    app: &Application,
+    buttons: &Vector<ButtonConfig>,
     columns: usize,
-) -> std::result::Result<Vector<Vector<usize>>, String> {
-    // Preserve original error conditions
-    if num_buttons == 7 {
-        return Err("7 buttons are not allowed...".into());
-    }
-    if num_buttons == 0 || num_buttons > 9 {
-        return Err("Number of buttons must be between 1 and 9.".into());
-    }
+) -> Result<(Grid, Vector<Button>)> {
+    let grid = create_grid();
 
-    // Create indices and chunk using standard Vec
-    let indices: Vec<usize> = (0..num_buttons).collect();
-    let layout = indices
-        .chunks(columns)
-        .map(|chunk| chunk.iter().copied().collect::<Vector<usize>>())
+    // Create and arrange buttons
+    let all_buttons = buttons
+        .iter()
+        .enumerate()
+        .map(|(index, cfg)| {
+            let button = create_action_button(app, &cfg.label, &cfg.command);
+            let row = index / columns;
+            let col = index % columns;
+
+            grid.attach(&button, col as i32, row as i32, 1, 1);
+            info!(
+                "Attached button '{}' at row {}, col {}",
+                cfg.label, row, col
+            );
+
+            button
+        })
         .collect::<Vector<_>>();
 
-    Ok(layout)
+    Ok((grid, all_buttons))
 }
+
 /// Calculates the new index for arrow-key navigation.
 fn new_index_for_arrow(current: usize, total: usize, columns: usize, key: gdk::Key) -> usize {
     match key {
@@ -314,14 +323,6 @@ fn calculate_new_index_for_tab(index: usize, total: usize, forward: bool) -> usi
         true => (index + 1) % total,
         false => (index + total - 1) % total,
     }
-}
-
-/// Converts a vector of button configurations into a vector of GTK buttons.
-fn create_buttons(app: &Application, btn_configs: &Vector<ButtonConfig>) -> Vector<Button> {
-    btn_configs
-        .iter()
-        .map(|btn_cfg| create_action_button(app, &btn_cfg.label, &btn_cfg.command))
-        .collect::<Vector<_>>()
 }
 
 /// Creates a GTK button that executes a command when clicked.
@@ -449,42 +450,24 @@ fn build_ui(
     window.set_resizable(false);
     window.set_tooltip_text(Some("Finë logout manager window"));
 
-    // If use_gtk_theme is true, we let the system theme handle styling.
-    // Otherwise, we load our custom CSS (if provided).
+    // CSS loading remains unchanged
     match stylesheet_path {
         Some(ref css_path) => load_css(css_path, false)?,
         None => load_css(&PathBuf::new(), true)?,
     }
 
-    let grid = create_grid();
-    grid.set_tooltip_text(Some("Button grid"));
-    let layout = calculate_layout(buttons.len(), config.columns).map_err(anyhow::Error::msg)?;
-    let all_buttons = create_buttons(app, buttons);
-    let button_widgets: Vector<Button> = layout
-        .iter()
-        .enumerate()
-        .flat_map(|(row, cols)| {
-            let grid_clone = grid.clone();
-            let all_buttons_clone = all_buttons.clone();
-            cols.iter().enumerate().map(move |(col, &index)| {
-                let button = all_buttons_clone.get(index).unwrap().clone();
-                info!(
-                    "Attaching button '{}' at row {}, col {}",
-                    button.label().unwrap_or_default(),
-                    row,
-                    col
-                );
-                grid_clone.attach(&button, col as i32, row as i32, 1, 1);
-                button
-            })
-        })
-        .collect();
-    setup_focus_chain(&grid, &button_widgets);
-    let buttons_rc = Rc::new(button_widgets);
+    // New declarative grid composition
+    let (grid, all_buttons) = compose_grid(app, buttons, config.columns)?;
+
+    // Use the buttons we already have from compose_grid
+    setup_focus_chain(&grid, &all_buttons);
+    let buttons_rc = Rc::new(all_buttons);
+
     window.set_child(Some(&grid));
     setup_focus_controller(&window, app);
     setup_key_handlers(&window, app, buttons_rc, config.columns);
     window.present();
+
     Ok(())
 }
 
@@ -550,7 +533,9 @@ fn main() -> Result<()> {
 
     let config = load_config(&config_path)?;
     let de = detect_desktop_environment();
-    let commands = get_commands_for_de(&de, &config);
+    let (commands, columns) = get_commands_for_de(&de, &config);
+    let config = Config { columns, ..config };
+
     let default_css = PathBuf::from("/usr/share/fin/style.css");
 
     // Use the updated select_css_path which returns Option<PathBuf>
