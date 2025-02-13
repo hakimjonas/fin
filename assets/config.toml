@@ -2,7 +2,7 @@
 title = "Finë"
 columns = 2
 stylesheet = "style.css"
-use_system_theme = false
+use_gtk_theme = false
 
 [default_commands]
 # GNOME
