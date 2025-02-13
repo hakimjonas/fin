@@ -16,7 +16,7 @@ use std::process::Command as ProcessCommand;
 use std::rc::Rc;
 
 //
-// Helper Functions for Configuration and CSS Resolution
+// 1. Configuration & CSS Resolution Helpers
 //
 
 /// Determines the configuration file path by checking in order:
@@ -38,104 +38,89 @@ fn determine_config_path() -> PathBuf {
 }
 
 /// Selects the CSS file path according to these rules:
-/// 1. If `use_gtk_theme` is true, ignore any provided CSS and let GTK’s system theme run.
+/// 1. If `use_gtk_theme` is true, custom CSS is ignored (returning None so the system theme applies).
 /// 2. Otherwise, if a user CSS path is provided, resolve it relative to the config file:
-///    - If the file exists, use it.
+///    - If the file exists, use it;
 ///    - Otherwise, warn and fall back to the default CSS.
 /// 3. If no user CSS is provided, use the default CSS.
 /// 4. If the default CSS file does not exist, try reading the system config for an alternative.
-/// 5. If all else fails, return `None` so that the built‑in GTK style is used.
+/// 5. If all else fails, return None (so that the built‑in GTK style is used).
 fn select_css_path(
     config_css: Option<String>,
     config_path: &Path,
     default_css: &Path,
     use_gtk_theme: bool,
 ) -> Result<Option<PathBuf>> {
-    // If we want to use the system (GTK) theme, ignore custom CSS.
     if use_gtk_theme {
         info!("use_gtk_theme is true; using system GTK theme (no custom CSS).");
         return Ok(None);
     }
 
-    // Attempt to use the user-specified CSS file.
-    if let Some(user_css_str) = config_css {
-        let user_css_path = PathBuf::from(&user_css_str);
-        let resolved_css_path = if user_css_path.is_absolute() {
-            user_css_path.clone()
-        } else {
-            config_path
-                .parent()
-                .map(|parent| parent.join(&user_css_path))
-                .unwrap_or(user_css_path.clone())
-        };
-        if resolved_css_path.exists() {
-            return Ok(Some(resolved_css_path));
-        } else {
-            warn!(
-                "User provided CSS '{}' not found. Falling back to default CSS '{}'.",
-                resolved_css_path.display(),
-                default_css.display()
-            );
-        }
-    }
+    let css_candidate = config_css
+        .map(|user_css| {
+            let user_path = PathBuf::from(&user_css);
+            let resolved = user_path
+                .is_absolute()
+                .then(|| user_path.clone())
+                .unwrap_or_else(|| {
+                    config_path
+                        .parent()
+                        .map_or(user_path.clone(), |parent| parent.join(&user_path))
+                });
 
-    // If the default CSS file exists, use it.
-    if default_css.exists() {
-        info!(
-            "No valid user CSS found; using default CSS '{}'.",
-            default_css.display()
-        );
-        return Ok(Some(default_css.to_path_buf()));
-    }
-
-    // Otherwise, try to read the system config for a CSS path.
-    // Allow an override via the FIN_SYSTEM_CONFIG environment variable.
-    let system_config_path = if let Ok(path) = env::var("FIN_SYSTEM_CONFIG") {
-        PathBuf::from(path)
-    } else {
-        PathBuf::from("/usr/share/fin/config.toml")
-    };
-
-    if let Ok(metadata) = fs::metadata(&system_config_path) {
-        if metadata.is_file() {
-            info!(
-                "Reading system config from '{}'.",
-                system_config_path.display()
-            );
-            if let Ok(content) = fs::read_to_string(&system_config_path) {
-                if let Ok(sys_config) = toml::from_str::<SystemConfig>(&content) {
-                    if let Some(system_css_str) = sys_config.css_path {
-                        let system_css_path = system_config_path
-                            .parent()
-                            .unwrap_or_else(|| Path::new(""))
-                            .join(system_css_str);
-                        if system_css_path.exists() {
-                            info!(
-                                "Using system-configured CSS at '{}'.",
-                                system_css_path.display()
-                            );
-                            return Ok(Some(system_css_path));
-                        } else {
-                            warn!(
-                                "System-configured CSS '{}' does not exist.",
-                                system_css_path.display()
-                            );
-                        }
-                    }
-                } else {
-                    warn!("Failed to parse system config for CSS.");
-                }
+            // Check existence without moving
+            if resolved.exists() {
+                resolved
             } else {
                 warn!(
-                    "Could not read system config from '{}'.",
-                    system_config_path.display()
+                    "User provided CSS '{}' not found. Falling back to default CSS '{}'.",
+                    resolved.display(),
+                    default_css.display()
                 );
+                default_css.to_path_buf()
             }
-        }
-    }
+        })
+        .unwrap_or_else(|| default_css.to_path_buf());
 
-    warn!("No valid CSS file found. Falling back to GTK built-in style.");
-    Ok(None)
+    let final_path = css_candidate
+        .exists()
+        .then(|| {
+            info!("Using CSS file at '{}'.", css_candidate.display());
+            css_candidate
+        })
+        .or_else(|| {
+            env::var("FIN_SYSTEM_CONFIG")
+                .ok()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("/usr/share/fin/config.toml"))
+                .metadata()
+                .ok()
+                .and_then(|md| md.is_file().then_some(()))
+                .and_then(|_| {
+                    let config_path = PathBuf::from("/usr/share/fin/config.toml");
+                    info!("Reading system config from '{}'.", config_path.display());
+                    fs::read_to_string(&config_path).ok()
+                })
+                .and_then(|content| toml::from_str::<SystemConfig>(&content).ok())
+                .and_then(|sys_config| sys_config.css_path)
+                .and_then(|css_str| {
+                    let config_dir = Path::new("/usr/share/fin");
+                    let path = config_dir.join(css_str);
+                    // Check existence without moving
+                    if path.exists() {
+                        info!("Using system-configured CSS at '{}'.", path.display());
+                        Some(path)
+                    } else {
+                        warn!("System-configured CSS '{}' does not exist.", path.display());
+                        None
+                    }
+                })
+        });
+
+    Ok(final_path.or_else(|| {
+        warn!("No valid CSS file found. Falling back to GTK built-in style.");
+        None
+    }))
 }
 
 #[derive(Deserialize)]
@@ -145,9 +130,9 @@ struct SystemConfig {
 }
 
 /// Loads the CSS file. If `use_gtk_theme` is true, no custom CSS is applied and the system theme remains.
-/// Otherwise, loads the specified CSS file.
+/// Otherwise, loads the specified CSS file and applies it with high priority.
 fn load_css(path: &Path, use_gtk_theme: bool) -> Result<()> {
-    // If we're using the system GTK theme, do not load custom CSS.
+    // If the system theme is desired, do not load any custom CSS.
     if use_gtk_theme {
         info!("use_gtk_theme is true; not applying custom CSS (using system theme).");
         return Ok(());
@@ -166,7 +151,7 @@ fn load_css(path: &Path, use_gtk_theme: bool) -> Result<()> {
                 path.display(),
                 e
             );
-            // If reading fails, load a minimal fallback (or leave blank to use the system default).
+            // Load an empty string to effectively apply no custom CSS.
             provider.load_from_string("");
         }
     }
@@ -175,13 +160,13 @@ fn load_css(path: &Path, use_gtk_theme: bool) -> Result<()> {
     gtk4::style_context_add_provider_for_display(
         &display,
         &provider,
-        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION, // High priority to override system styles.
+        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION, // Use high priority for full control.
     );
     Ok(())
 }
 
 //
-// Configuration Structures and Loading
+// 2. Configuration Structures and Loading
 //
 
 fn default_columns() -> usize {
@@ -267,7 +252,7 @@ fn get_commands_for_de(de: &str, config: &Config) -> Vector<ButtonConfig> {
 }
 
 //
-// UI and Navigation Functions
+// 3. UI and Navigation Functions
 //
 
 /// Calculates the grid layout as a nested vector of button indices.
@@ -304,56 +289,39 @@ fn calculate_layout(num_buttons: usize) -> std::result::Result<Vector<Vector<usi
 /// Calculates the new index for arrow-key navigation.
 fn new_index_for_arrow(current: usize, total: usize, columns: usize, key: gdk::Key) -> usize {
     match key {
-        gdk::Key::Up | gdk::Key::KP_Up => {
-            if current < columns {
-                let remainder = total % columns;
-                let last_row_start = if remainder == 0 {
-                    total - columns
-                } else {
-                    total - remainder
-                };
-                (last_row_start + current).min(total - 1)
-            } else {
-                current - columns
-            }
-        }
+        // Vertical navigation using modular arithmetic
+        gdk::Key::Up | gdk::Key::KP_Up => current
+            .checked_sub(columns)
+            .unwrap_or_else(|| {
+                // Calculate last row starting position
+                let last_row_start =
+                    total.saturating_sub(columns) - (total % columns).saturating_sub(1);
+                last_row_start + current % columns
+            })
+            .min(total.saturating_sub(1)),
+
         gdk::Key::Down | gdk::Key::KP_Down => {
-            if current + columns >= total {
+            let next_row = current + columns;
+            if next_row < total {
+                next_row
+            } else {
                 current % columns
-            } else {
-                current + columns
             }
         }
-        gdk::Key::Left | gdk::Key::KP_Left => {
-            if current == 0 {
-                total - 1
-            } else {
-                current - 1
-            }
-        }
-        gdk::Key::Right | gdk::Key::KP_Right => {
-            if current == total - 1 {
-                0
-            } else {
-                current + 1
-            }
-        }
+
+        // Horizontal navigation using modular arithmetic
+        gdk::Key::Left | gdk::Key::KP_Left => (current + total - 1) % total,
+        gdk::Key::Right | gdk::Key::KP_Right => (current + 1) % total,
+
         _ => current,
     }
 }
 
-/// Calculates the new index for Tab-key navigation in a cyclic manner.
+/// Calculates the new index for Tab navigation using modular arithmetic
 fn calculate_new_index_for_tab(index: usize, total: usize, forward: bool) -> usize {
-    if forward {
-        if index + 1 >= total {
-            0
-        } else {
-            index + 1
-        }
-    } else if index == 0 {
-        total - 1
-    } else {
-        index - 1
+    match forward {
+        true => (index + 1) % total,
+        false => (index + total - 1) % total,
     }
 }
 
@@ -490,8 +458,8 @@ fn build_ui(
     window.set_resizable(false);
     window.set_tooltip_text(Some("Finë logout manager window"));
 
-    // Use the provided stylesheet_path if Some; otherwise, if use_gtk_theme is true,
-    // then do not load any custom CSS so that the system GTK theme is used.
+    // If use_gtk_theme is true, we let the system theme handle styling.
+    // Otherwise, we load our custom CSS (if provided).
     match stylesheet_path {
         Some(ref css_path) => load_css(css_path, false)?,
         None => load_css(&PathBuf::new(), true)?,
@@ -556,7 +524,7 @@ fn detect_desktop_environment() -> String {
 }
 
 //
-// Main Entry Point
+// 4. Main Entry Point
 //
 
 fn main() -> Result<()> {
