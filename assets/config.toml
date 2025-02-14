@@ -1,4 +1,7 @@
 # Finë Default Configuration
+# Defines default logout and power management commands for various desktop environments.
+# They are meant as sane defaults, so please adjust them to your needs.
+
 title = "Finë"
 columns = 2
 stylesheet = "style.css"
@@ -6,32 +9,49 @@ use_gtk_theme = false
 
 [default_commands]
 
-[default_commands.gnome]
+# Common commands
+[default_commands.common]
+columns = 2
 buttons = [
-    { label = "󰌾", command = "xdg-screensaver lock" },
-    { label = "󰍃", command = "gnome-session-quit --logout" },
-    { label = "󰜉", command = "systemctl reboot -i" },
-    { label = "󰐥", command = "systemctl poweroff -i" }
+    { label = "Lock", command = "loginctl lock-session" },
+    { label = "Logout", command = "loginctl terminate-session $XDG_SESSION_ID" },
+    { label = "Reboot", command = "systemctl reboot" },
+    { label = "Poweroff", command = "systemctl poweroff" }
 ]
 
+# GNOME: Locks screen, logs out, reboots, and powers off.
+[default_commands.gnome]
+columns = 2
+buttons = [
+    { label = "󰌾", command = "dbus-send --type=method_call --dest=org.gnome.ScreenSaver /org/gnome/ScreenSaver org.gnome.ScreenSaver.Lock" },
+    { label = "󰍃", command = "gnome-session-quit --logout" },
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
+]
+
+# Hyprland: Locks screen, logs out, reboots, and powers off.
 [default_commands.hyprland]
-columns = 2  # Hyprland-specific column count
+columns = 2
 buttons = [
     { label = "󰌾", command = "hyprlock" },
     { label = "󰍃", command = "hyprctl dispatch exit" },
-    { label = "󰜉", command = "systemctl reboot --firmware-setup" },
-    { label = "󰐥", command = "systemctl poweroff --hybrid" }
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
 ]
 
+# Budgie: Locks screen, logs out, reboots, and powers off.
 [default_commands.budgie]
+columns = 2
 buttons = [
     { label = "󰌾", command = "budgie-screensaver lock" },
     { label = "󰍃", command = "budgie-session-quit --logout" },
-    { label = "󰜉", command = "systemctl reboot --message='Rebooting system...'" },
-    { label = "󰐥", command = "systemctl poweroff --message='Shutting down...'" }
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
 ]
 
+# XFCE: Locks screen, logs out, reboots, and powers off.
 [default_commands.xfce]
+columns = 2
 buttons = [
     { label = "󰌾", command = "xflock4" },
     { label = "󰍃", command = "xfce4-session-logout --logout" },
@@ -39,8 +59,9 @@ buttons = [
     { label = "󰐥", command = "systemctl poweroff" }
 ]
 
+# i3: Locks screen, logs out, reboots, and powers off.
 [default_commands.i3]
-columns = 1  # Vertical stack layout
+columns = 2
 buttons = [
     { label = "󰌾", command = "i3lock -c 000000" },
     { label = "󰍃", command = "i3-msg exit" },
@@ -48,28 +69,33 @@ buttons = [
     { label = "󰐥", command = "systemctl poweroff" }
 ]
 
+# Sway: Locks screen, logs out, reboots, and powers off.
 [default_commands.sway]
+columns = 2
 buttons = [
     { label = "󰌾", command = "swaylock -f -c 000000" },
     { label = "󰍃", command = "swaymsg exit" },
-    { label = "󰜉", command = "systemctl reboot --firmware-setup" },
-    { label = "󰐥", command = "systemctl poweroff --hybrid" }
-]
-
-[default_commands.come]
-columns = 3  # Experimental 3-column layout
-buttons = [
-    { label = "󰤄", command = "system76-power suspend" },
-    { label = "󰌾", command = "loginctl lock-session" },
-    { label = "󰍃", command = "gnome-session-quit --logout" },
     { label = "󰜉", command = "systemctl reboot" },
     { label = "󰐥", command = "systemctl poweroff" }
 ]
 
+# COSMIC: Suspends, locks screen, logs out, reboots, and powers off.
+[default_commands.cosmic]
+columns = 1
+buttons = [
+    { label = "󰤄", command = "systemctl suspend" },
+    { label = "󰌾", command = "loginctl lock-session" },
+    { label = "󰍃", command = "loginctl terminate-session $XDG_SESSION_ID" },
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
+]
+
+# Default: Locks screen, logs out, reboots, and powers off.
 [default_commands.default]
-columns = 1  # Fallback single-column layout
+columns = 1
 buttons = [
     { label = "󰌾", command = "loginctl lock-session" },
+    { label = "󰍃", command = "loginctl terminate-session $XDG_SESSION_ID" },
     { label = "󰜉", command = "systemctl reboot" },
     { label = "󰐥", command = "systemctl poweroff" }
 ]

@@ -54,10 +54,10 @@ sudo apt-get install -f
 
 If you prefer to manually install the application, follow these steps:
 
-#### Build the application:
+#### Build and install the application:
 
 ```sh
-cargo build --release
+cargo make install
 ```
 
 #### Copy assets:

@@ -4,7 +4,6 @@ PROJECT_ROOT = "${CARGO_MAKE_WORKING_DIRECTORY}"
 ASSETS_DIR = "${PROJECT_ROOT}/assets"
 INSTALL_ASSETS_DIR = "/usr/share/fin"
 INSTALL_BIN_DIR = "/usr/local/bin"
-# Use the built-in variable provided by cargo-make
 VERSION = "${CARGO_MAKE_CRATE_VERSION}"
 
 [tasks.install-cargo-make]
@@ -94,11 +93,28 @@ script = [
     "fi"
 ]
 
+[tasks.copy-user-config]
+description = "Copy configuration and style assets to the user's home directory if not already present"
+script = [
+    "USER_CONFIG_DIR=${HOME}/.config/fin",
+    "mkdir -p ${USER_CONFIG_DIR}",
+    "if [ ! -f ${USER_CONFIG_DIR}/config.toml ]; then",
+    "  echo 'Copying default configuration to ${USER_CONFIG_DIR}/config.toml'",
+    "  cp ${ASSETS_DIR}/config.toml ${USER_CONFIG_DIR}/config.toml",
+    "else",
+    "  echo 'User configuration already exists at ${USER_CONFIG_DIR}/config.toml'",
+    "fi",
+    "if [ ! -f ${USER_CONFIG_DIR}/style.css ]; then",
+    "  echo 'Copying default stylesheet to ${USER_CONFIG_DIR}/style.css'",
+    "  cp ${ASSETS_DIR}/style.css ${USER_CONFIG_DIR}/style.css",
+    "else",
+    "  echo 'User stylesheet already exists at ${USER_CONFIG_DIR}/style.css'",
+    "fi"
+]
+
 [tasks.install]
 description = "Build and install Finë (binary and assets)"
-dependencies = ["install-dependencies", "build-release", "copy-assets", "install-bin"]
-
-# --- Packaging Tasks ---
+dependencies = ["install-dependencies", "build-release", "copy-assets", "install-bin", "copy-user-config"]
 
 [tasks.package-deb]
 description = "Package Finë as a .deb using cargo-deb"
@@ -147,6 +163,7 @@ script = [
     "tar -czvf target/fin-${VERSION}-nix.tar.gz -C target/package/nix fin",
     "echo 'Nix package created: target/fin-${VERSION}-nix.tar.gz'"
 ]
+
 [tasks.package]
 description = "Package Finë for distribution (Debian, Solus, Arch, and Nix)"
 dependencies = [
