@@ -22,7 +22,8 @@ reliable, and free from typographical misadventures.
 
 ![default-style](https://github.com/user-attachments/assets/f99f3644-8822-4c3a-8e70-d0379ca28e32)
 
-The default css - not claiming to be a css artist just wanted to provide a simply non ugly default. Colors are borrowed from the famous [Catppuccin](https://catppuccin.com/) theme.
+The default css - not claiming to be a css artist just wanted to provide a simply non ugly default. Colors are borrowed
+from the famous [Catppuccin](https://catppuccin.com/) theme.
 
 ## Dependencies
 
@@ -43,11 +44,10 @@ To run the application, simply run:
 fin
 ```
 
-If you installed manually, make sure to build the project first:
+If you choose to installed manually:
 
 ```bash
-cargo build --release
-```
+cargo make install```
 
 ## Configuration
 
