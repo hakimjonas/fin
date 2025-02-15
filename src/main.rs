@@ -4,8 +4,6 @@ It loads a configuration file, resolves CSS paths (user-specified or default),
 loads a theme (user or system provided), and builds a GTK-based UI with action buttons.
 */
 
-mod theming;
-
 use anyhow::{anyhow, Context, Result};
 use clap::{parser::ValueSource, Arg, Command};
 use glib::Propagation;
