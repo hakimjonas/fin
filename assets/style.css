@@ -1,15 +1,47 @@
-/* Finë Default Stylesheet */
-/* This file controls the visual presentation of Finë’s UI.
-   Layout details like grid margins and spacing can be defined in the CSS if desired,
-   while overall scaling (window size, responsive font size) is controlled by config.toml. */
+/* Finë Default Stylesheet
+   This stylesheet uses CSS variables for theming. The variables are injected dynamically
+   from the theme.toml file (e.g., via Rust code). If these variables are not defined,
+   the UI will show broken styling, alerting the user that the theme is missing or misconfigured.
 
-/* Button styling */
+   CSS Variable Descriptions:
+     --background:             The window's background color.
+     --foreground:             The primary text color used in buttons and labels.
+     --cursor-color:           The color of the cursor.
+     --cursor-text:            The color of any text displayed on the cursor.
+     --selection-background:   The background color for selected text.
+     --selection-foreground:   The text color for selected text.
+
+     --palette-0 to --palette-15:
+       A palette of colors used for various UI elements (e.g., button backgrounds, hover states, etc.).
+       For example:
+            --palette-0:          Typically used as the default button background.
+            --palette-1:          Secondary color, etc.
+            --palette-2:          Used for hover states.
+            --palette-3:          Used for active states.
+            --palette-4:          Used for borders.
+            --palette-5:          Used for text.
+            --palette-6:          Used for text shadows.
+            --palette-7:          Used for box shadows.
+            --palette-8:          Used for selection background.
+            --palette-9:          Used for selection foreground.
+            --palette-10:         Used for the cursor.
+            --palette-11:         Used for the cursor text.
+            --palette-12:         Used for the window border.
+            --palette-13:         Used for the grid padding.
+            --palette-14:         Used for the grid background.
+            --palette-15:         Used for the grid border.
+*/
+
+:root {
+    /* These variables should be defined by the dynamic theme injection.
+       If missing, the UI will not render correctly. */
+}
+
 button {
-    background: #313244;
-    color: #f5e0dc;
+    background: var(--palette-0);
+    color: var(--foreground);
     font-family: "Mononoki Nerd Font", monospace;
-    /* Note: The font-size for buttons is injected dynamically via generated CSS.
-       If not overridden, this value may serve as a fallback: */
+    /* Font size is dynamically injected based on the window height; this is a fallback. */
     font-size: 72px;
     border-radius: 7px;
     border: none;
@@ -21,41 +53,37 @@ button {
 }
 
 button:hover {
-    background: #45475a;
-    color: #f5e0dc;
+    background: var(--palette-2);
+    color: var(--foreground);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 button:focus {
     outline: none;
-    border: 1px solid #f5e0dc;
-    background: #45475a;
-    color: #f5e0dc;
+    border: 1px solid var(--foreground);
+    background: var(--palette-2);
+    color: var(--foreground);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 button:active,
 button:active:focus {
-    background: #585b70;
-    color: #f5e0dc;
-    outline: 2px solid #f5e0dc;
+    background: var(--palette-3);
+    color: var(--foreground);
+    outline: 2px solid var(--foreground);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* Window styling */
 window {
-    background: #1e1e2e;
-    border: 0 solid #313244;
+    background: var(--background);
+    border: 0 solid var(--palette-0);
     padding: 2px;
     border-radius: 11px;
 }
 
-/* Grid styling */
-/* While grid margins and spacing could be injected via configuration,
-   here we delegate that to the CSS for finer control if desired. */
 grid {
     padding: 1px;
 }

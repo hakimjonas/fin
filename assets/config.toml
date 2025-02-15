@@ -1,27 +1,44 @@
 # Finë Default Configuration
 title = "Finë"
-columns = 2
-stylesheet = "style.css"
 use_gtk_theme = false
+theme = "default"
+stylesheet = "style.css"
 
 [layout]
-# Ratios for overall window sizing relative to the primary monitor:
-window_width_ratio = 0.3    # 30% of monitor width
-window_height_ratio = 0.3   # 30% of monitor height
-
-# Ratio of window height used to calculate the button font size dynamically.
-button_font_ratio = 0.12    # e.g., 12% of window height
+window_width_ratio = 0.3
+window_height_ratio = 0.3
+button_font_ratio = 0.12
 
 [default_commands]
 
-# Common commands
-[default_commands.common]
+# Hyprland: Locks screen, logs out, reboots, and powers off.
+[default_commands.hyprland]
 columns = 2
 buttons = [
-    { label = "Lock", command = "loginctl lock-session" },
-    { label = "Logout", command = "loginctl terminate-session $XDG_SESSION_ID" },
-    { label = "Reboot", command = "systemctl reboot" },
-    { label = "Poweroff", command = "systemctl poweroff" }
+    { label = "󰌾", command = "hyprlock" },
+    { label = "󰍃", command = "hyprctl dispatch exit" },
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
+]
+
+# Sway: Locks screen, logs out, reboots, and powers off.
+[default_commands.sway]
+columns = 2
+buttons = [
+    { label = "󰌾", command = "swaylock -f -c 000000" },
+    { label = "󰍃", command = "swaymsg exit" },
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
+]
+
+# i3: Locks screen, logs out, reboots, and powers off.
+[default_commands.i3]
+columns = 2
+buttons = [
+    { label = "󰌾", command = "i3lock -c 000000" },
+    { label = "󰍃", command = "i3-msg exit" },
+    { label = "󰜉", command = "systemctl reboot" },
+    { label = "󰐥", command = "systemctl poweroff" }
 ]
 
 # GNOME: Locks screen, logs out, reboots, and powers off.
@@ -30,16 +47,6 @@ columns = 2
 buttons = [
     { label = "󰌾", command = "dbus-send --type=method_call --dest=org.gnome.ScreenSaver /org/gnome/ScreenSaver org.gnome.ScreenSaver.Lock" },
     { label = "󰍃", command = "gnome-session-quit --logout" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
-]
-
-# Hyprland: Locks screen, logs out, reboots, and powers off.
-[default_commands.hyprland]
-columns = 2
-buttons = [
-    { label = "󰌾", command = "hyprlock" },
-    { label = "󰍃", command = "hyprctl dispatch exit" },
     { label = "󰜉", command = "systemctl reboot" },
     { label = "󰐥", command = "systemctl poweroff" }
 ]
@@ -64,29 +71,9 @@ buttons = [
     { label = "󰐥", command = "systemctl poweroff" }
 ]
 
-# i3: Locks screen, logs out, reboots, and powers off.
-[default_commands.i3]
-columns = 2
-buttons = [
-    { label = "󰌾", command = "i3lock -c 000000" },
-    { label = "󰍃", command = "i3-msg exit" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
-]
-
-# Sway: Locks screen, logs out, reboots, and powers off.
-[default_commands.sway]
-columns = 2
-buttons = [
-    { label = "󰌾", command = "swaylock -f -c 000000" },
-    { label = "󰍃", command = "swaymsg exit" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
-]
-
 # COSMIC: Suspends, locks screen, logs out, reboots, and powers off.
 [default_commands.cosmic]
-columns = 1
+columns = 2
 buttons = [
     { label = "󰤄", command = "systemctl suspend" },
     { label = "󰌾", command = "loginctl lock-session" },
@@ -95,12 +82,12 @@ buttons = [
     { label = "󰐥", command = "systemctl poweroff" }
 ]
 
-# Default: Locks screen, logs out, reboots, and powers off.
-[default_commands.default]
-columns = 1
+# Common commands (fallback)
+[default_commands.common]
+columns = 2
 buttons = [
-    { label = "󰌾", command = "loginctl lock-session" },
-    { label = "󰍃", command = "loginctl terminate-session $XDG_SESSION_ID" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
+    { label = "Lock", command = "loginctl lock-session" },
+    { label = "Logout", command = "loginctl terminate-session $XDG_SESSION_ID" },
+    { label = "Reboot", command = "systemctl reboot" },
+    { label = "Poweroff", command = "systemctl poweroff" }
 ]

@@ -23,16 +23,19 @@ command = "cargo"
 args = ["build", "--release"]
 
 [tasks.copy-assets]
-description = "Copy configuration and style assets to the installation directory"
+description = "Copy configuration, theme, and style assets to the installation directory"
 script = [
     "echo 'Creating installation directory ${INSTALL_ASSETS_DIR}'",
-    "sudo mkdir -p ${INSTALL_ASSETS_DIR}",
+    "sudo mkdir -p ${INSTALL_ASSETS_DIR}/themes",
     "sudo chmod 755 ${INSTALL_ASSETS_DIR}",
     "echo 'Installing default configuration...'",
     "sudo cp \"${ASSETS_DIR}/config.toml\" \"${INSTALL_ASSETS_DIR}/config.toml\"",
     "echo 'Installing default stylesheet...'",
-    "sudo cp \"${ASSETS_DIR}/style.css\" \"${INSTALL_ASSETS_DIR}/style.css\""
+    "sudo cp \"${ASSETS_DIR}/style.css\" \"${INSTALL_ASSETS_DIR}/style.css\"",
+    "echo 'Installing default theme...'",
+    "sudo cp \"${ASSETS_DIR}/default.toml\" \"${INSTALL_ASSETS_DIR}/themes/default.toml\""
 ]
+
 
 [tasks.install-bin]
 description = "Install the binary to the system binary directory"
@@ -94,10 +97,10 @@ script = [
 ]
 
 [tasks.copy-user-config]
-description = "Copy configuration and style assets to the user's home directory if not already present"
+description = "Copy configuration, theme, and style assets to the user's home directory if not already present"
 script = [
     "USER_CONFIG_DIR=${HOME}/.config/fin",
-    "mkdir -p ${USER_CONFIG_DIR}",
+    "mkdir -p ${USER_CONFIG_DIR}/themes",
     "if [ ! -f ${USER_CONFIG_DIR}/config.toml ]; then",
     "  echo 'Copying default configuration to ${USER_CONFIG_DIR}/config.toml'",
     "  cp ${ASSETS_DIR}/config.toml ${USER_CONFIG_DIR}/config.toml",
@@ -109,8 +112,15 @@ script = [
     "  cp ${ASSETS_DIR}/style.css ${USER_CONFIG_DIR}/style.css",
     "else",
     "  echo 'User stylesheet already exists at ${USER_CONFIG_DIR}/style.css'",
+    "fi",
+    "if [ ! -f ${USER_CONFIG_DIR}/themes/default.toml ]; then",
+    "  echo 'Copying default theme to ${USER_CONFIG_DIR}/themes/default.toml'",
+    "  cp ${ASSETS_DIR}/default.toml ${USER_CONFIG_DIR}/themes/default.toml",
+    "else",
+    "  echo 'User theme already exists at ${USER_CONFIG_DIR}/themes/default.toml'",
     "fi"
 ]
+
 
 [tasks.install]
 description = "Build and install Finë (binary and assets)"
