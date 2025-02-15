@@ -1,16 +1,23 @@
-/* Catppuccin Theme */
+/* Finë Default Stylesheet */
+/* This file controls the visual presentation of Finë’s UI.
+   Layout details like grid margins and spacing can be defined in the CSS if desired,
+   while overall scaling (window size, responsive font size) is controlled by config.toml. */
 
+/* Button styling */
 button {
     background: #313244;
     color: #f5e0dc;
     font-family: "Mononoki Nerd Font", monospace;
+    /* Note: The font-size for buttons is injected dynamically via generated CSS.
+       If not overridden, this value may serve as a fallback: */
     font-size: 72px;
     border-radius: 7px;
     border: none;
     padding: 2px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-    transition: background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, text-shadow 0.3s ease;
+    transition: background 0.3s ease, color 0.3s ease,
+    box-shadow 0.3s ease, text-shadow 0.3s ease;
 }
 
 button:hover {
@@ -23,21 +30,14 @@ button:hover {
 button:focus {
     outline: none;
     border: 1px solid #f5e0dc;
-
     background: #45475a;
     color: #f5e0dc;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-button:focus:hover {
-    background: #585b70;
-    color: #f5e0dc;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-button:active, button:active:focus {
+button:active,
+button:active:focus {
     background: #585b70;
     color: #f5e0dc;
     outline: 2px solid #f5e0dc;
@@ -45,6 +45,7 @@ button:active, button:active:focus {
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
+/* Window styling */
 window {
     background: #1e1e2e;
     border: 0 solid #313244;
@@ -52,6 +53,11 @@ window {
     border-radius: 11px;
 }
 
+/* Grid styling */
+/* While grid margins and spacing could be injected via configuration,
+   here we delegate that to the CSS for finer control if desired. */
 grid {
     padding: 1px;
 }
+
+/* Additional styles can be added here as needed */

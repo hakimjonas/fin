@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{parser::ValueSource, Arg, Command};
 use glib::Propagation;
+use gtk4::gdk::Monitor;
 use gtk4::{
     gdk, prelude::*, Application, ApplicationWindow, Button, CssProvider, EventControllerFocus,
     EventControllerKey, Grid,
@@ -14,7 +15,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use std::rc::Rc;
-
 //
 // 1. Configuration & CSS Resolution Helpers
 //
@@ -194,6 +194,41 @@ struct DECommands {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+struct LayoutConfig {
+    /// Ratio of the monitor width to use for the window width (e.g., 0.3 for 30%)
+    #[serde(default = "default_window_width_ratio")]
+    window_width_ratio: f64,
+    /// Ratio of the monitor height to use for the window height (e.g., 0.3 for 30%)
+    #[serde(default = "default_window_height_ratio")]
+    window_height_ratio: f64,
+    /// Ratio of the window height to use for the button's font size (e.g., 0.12 for 12%)
+    #[serde(default = "default_button_font_ratio")]
+    button_font_ratio: f64,
+    /// Margin for the grid (in pixels)
+    #[serde(default = "default_grid_margin")]
+    grid_margin: i32,
+    /// Spacing between grid cells (in pixels)
+    #[serde(default = "default_grid_spacing")]
+    grid_spacing: i32,
+}
+
+fn default_window_width_ratio() -> f64 {
+    0.3
+}
+fn default_window_height_ratio() -> f64 {
+    0.3
+}
+fn default_button_font_ratio() -> f64 {
+    0.14
+}
+fn default_grid_margin() -> i32 {
+    20
+}
+fn default_grid_spacing() -> i32 {
+    10
+}
+
+#[derive(Deserialize, Debug, Clone)]
 struct Config {
     title: String,
     #[serde(default = "default_columns")]
@@ -208,6 +243,9 @@ struct Config {
     de_overrides: HashMap<String, Vector<ButtonConfig>>,
     #[serde(default)]
     default_commands: HashMap<String, DECommands>,
+    // New field for layout customization:
+    #[serde(default)]
+    layout: Option<LayoutConfig>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -328,6 +366,8 @@ fn calculate_new_index_for_tab(index: usize, total: usize, forward: bool) -> usi
 /// Creates a GTK button that executes a command when clicked.
 fn create_action_button(app: &Application, label: &str, command: &str) -> Button {
     let button = Button::with_label(label);
+    // Tag the button with a class for styling its label responsively.
+    button.add_css_class("action-button");
     button.set_tooltip_text(Some(&format!("Executes command: {}", command)));
     let command_string = command.to_string();
     let app_clone = app.clone();
@@ -439,27 +479,74 @@ fn build_ui(
         ));
     }
 
+    // Retrieve the default display.
+    let display =
+        gdk::Display::default().ok_or_else(|| anyhow!("Could not get default display"))?;
+
+    // Get the list of monitors and select the first one.
+    let monitors = display.monitors();
+    let primary_monitor = monitors
+        .item(0)
+        .and_then(|obj| obj.downcast::<Monitor>().ok())
+        .ok_or_else(|| anyhow!("Could not get primary monitor"))?;
+
+    // Retrieve the geometry of the chosen monitor.
+    let geom = primary_monitor.geometry();
+
+    // Use provided layout config or default values.
+    let layout = config.layout.clone().unwrap_or(LayoutConfig {
+        window_width_ratio: default_window_width_ratio(),
+        window_height_ratio: default_window_height_ratio(),
+        button_font_ratio: default_button_font_ratio(),
+        grid_margin: default_grid_margin(),
+        grid_spacing: default_grid_spacing(),
+    });
+
+    // Calculate window dimensions based on ratios.
+    let window_width = (geom.width() as f64 * layout.window_width_ratio) as i32;
+    let window_height = (geom.height() as f64 * layout.window_height_ratio) as i32;
+
     let window = ApplicationWindow::builder()
         .application(app)
         .title(&config.title)
-        .default_width(600)
-        .default_height(400)
+        .default_width(window_width)
+        .default_height(window_height)
         .build();
     window.set_decorated(false);
     window.set_transient_for(None::<&ApplicationWindow>);
     window.set_resizable(false);
     window.set_tooltip_text(Some("Finë logout manager window"));
 
-    // CSS loading remains unchanged
+    // Generate dynamic CSS for responsive button text.
+    let font_size = (window_height as f64 * layout.button_font_ratio) as i32;
+    let dynamic_css = format!(".action-button {{ font-size: {}px; }}", font_size);
+    let dynamic_provider = CssProvider::new();
+    dynamic_provider.load_from_string(&dynamic_css);
+    info!("Loaded dynamic CSS: {}", dynamic_css);
+    gtk4::style_context_add_provider_for_display(
+        &display,
+        &dynamic_provider,
+        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
+    );
+
+    // Load user-specified CSS or fallback.
     match stylesheet_path {
         Some(ref css_path) => load_css(css_path, false)?,
         None => load_css(&PathBuf::new(), true)?,
     }
 
-    // New declarative grid composition
+    // Compose grid with layout margins and spacing.
+    let grid = Grid::builder()
+        .column_homogeneous(true)
+        .row_homogeneous(true)
+        .column_spacing(layout.grid_spacing)
+        .row_spacing(layout.grid_spacing)
+        .margin_top(layout.grid_margin)
+        .margin_bottom(layout.grid_margin)
+        .margin_start(layout.grid_margin)
+        .margin_end(layout.grid_margin)
+        .build();
     let (grid, all_buttons) = compose_grid(app, buttons, config.columns)?;
-
-    // Use the buttons we already have from compose_grid
     setup_focus_chain(&grid, &all_buttons);
     let buttons_rc = Rc::new(all_buttons);
 

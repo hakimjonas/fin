@@ -1,11 +1,16 @@
 # Finë Default Configuration
-# Defines default logout and power management commands for various desktop environments.
-# They are meant as sane defaults, so please adjust them to your needs.
-
 title = "Finë"
 columns = 2
 stylesheet = "style.css"
 use_gtk_theme = false
+
+[layout]
+# Ratios for overall window sizing relative to the primary monitor:
+window_width_ratio = 0.3    # 30% of monitor width
+window_height_ratio = 0.3   # 30% of monitor height
+
+# Ratio of window height used to calculate the button font size dynamically.
+button_font_ratio = 0.12    # e.g., 12% of window height
 
 [default_commands]
 
