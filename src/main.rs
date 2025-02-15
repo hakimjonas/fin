@@ -1,3 +1,11 @@
+/*!
+This module implements the Finë application launcher.
+It loads a configuration file, resolves CSS paths (user-specified or default),
+loads a theme (user or system provided), and builds a GTK-based UI with action buttons.
+*/
+
+mod theming;
+
 use anyhow::{anyhow, Context, Result};
 use clap::{parser::ValueSource, Arg, Command};
 use glib::Propagation;
@@ -16,13 +24,25 @@ use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use std::rc::Rc;
 
-//
-// 1. Configuration & CSS Resolution Helpers
-//
+// ------------------------------------------------------------
+// Constants for grid spacing and margins (avoiding magic numbers)
+// ------------------------------------------------------------
+const GRID_COLUMN_SPACING: i32 = 10;
+const GRID_ROW_SPACING: i32 = 10;
+const GRID_MARGIN: i32 = 20;
 
-/// Determines the configuration file path by checking in order:
-/// - `XDG_CONFIG_HOME` (or `HOME`) based default location,
-/// - Falls back to `/usr/share/fin/config.toml`.
+// ------------------------------------------------------------
+// 1. Configuration & CSS Resolution Helpers
+// ------------------------------------------------------------
+
+/// Determines the configuration file path by checking, in order:
+/// 1. The path specified by the `XDG_CONFIG_HOME` environment variable.
+/// 2. The path derived from the `HOME` environment variable (`$HOME/.config/fin/config.toml`).
+/// 3. Falls back to the system-wide configuration file at `/usr/share/fin/config.toml`.
+///
+/// # Returns
+///
+/// A `PathBuf` pointing to the configuration file.
 fn determine_config_path() -> PathBuf {
     env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
@@ -35,17 +55,40 @@ fn determine_config_path() -> PathBuf {
             })
         })
         .filter(|path| path.exists() && path.is_file())
-        .unwrap_or_else(|| PathBuf::from("/usr/share/fin/config.toml"))
+        .unwrap_or(PathBuf::from("/usr/share/fin/config.toml"))
 }
 
-/// Selects the CSS file path according to these rules:
-/// 1. If `use_gtk_theme` is true, custom CSS is ignored (returning None so the system theme applies).
-/// 2. Otherwise, if a user CSS path is provided, resolve it relative to the config file:
-///    - If the file exists, use it;
-///    - Otherwise, warn and fall back to the default CSS.
-/// 3. If no user CSS is provided, use the default CSS.
-/// 4. If the default CSS file does not exist, try reading the system config for an alternative.
-/// 5. If all else fails, return None (so that the built‑in GTK style is used).
+/// Resolves the CSS file path using these precedence rules:
+///
+/// 1. When `use_gtk_theme` is true:
+///    - Ignores custom CSS configurations
+///    - Returns `None` to apply the system GTK theme
+///
+/// 2. When user provides `config_css`:
+///    - Resolves path relative to `config_path`
+///    - Uses file if found
+///    - Logs warning and falls back to `default_css` if missing
+///
+/// 3. With no user-provided CSS:
+///    - Uses `default_css` path directly
+///
+/// 4. If `default_css` missing:
+///    - Attempts to find alternative in system configuration
+///
+/// 5. When all options fail:
+///    - Returns `None` to use GTK4's built-in styling
+///
+/// # Parameters
+/// - `config_css`: User-provided CSS path from configuration (optional)
+/// - `config_path`: Parent directory for resolving relative CSS paths
+/// - `default_css`: Fallback CSS path bundled with application
+/// - `use_gtk_theme`: When true, prioritizes system theme over custom CSS
+///
+/// # Returns
+/// `Result<Option<PathBuf>, Error>` where:
+/// - `Ok(Some(path))`: Valid CSS file found
+/// - `Ok(None)`: Use default GTK styling
+/// - `Err(e)`: File system error occurred during resolution
 fn select_css_path(
     config_css: Option<String>,
     config_path: &Path,
@@ -57,123 +100,191 @@ fn select_css_path(
         return Ok(None);
     }
 
-    let css_candidate = config_css
+    let css_path = config_css
         .map(|user_css| {
             let user_path = PathBuf::from(&user_css);
-            let resolved = if user_path.is_absolute() {
+            let resolved_path = if user_path.is_absolute() {
                 user_path.clone()
             } else {
                 config_path
                     .parent()
                     .map_or(user_path.clone(), |parent| parent.join(&user_path))
             };
-            println!("Resolved CSS path: {:?}", resolved);
-            if resolved.exists() {
-                resolved
+            info!("Resolved CSS path: {:?}", resolved_path);
+            if resolved_path.exists() {
+                resolved_path
             } else {
                 warn!(
                     "User provided CSS '{}' not found. Falling back to default CSS '{}'.",
-                    resolved.display(),
+                    resolved_path.display(),
                     default_css.display()
                 );
-                println!("User CSS not found. Falling back to default CSS.");
                 default_css.to_path_buf()
             }
         })
-        .unwrap_or_else(|| default_css.to_path_buf());
+        .unwrap_or(default_css.to_path_buf());
 
-    let final_path = css_candidate
-        .exists()
-        .then(|| {
-            info!("Using CSS file at '{}'.", css_candidate.display());
-            println!("Using CSS file at: {:?}", css_candidate);
-            css_candidate
-        })
-        .or_else(|| {
-            println!("Default CSS not found. Checking system config.");
-            env::var("FIN_SYSTEM_CONFIG")
-                .ok()
-                .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from("/usr/share/fin/config.toml"))
-                .metadata()
-                .ok()
-                .and_then(|md| md.is_file().then_some(()))
-                .and_then(|_| {
-                    let config_path = PathBuf::from("/usr/share/fin/config.toml");
-                    info!("Reading system config from '{}'.", config_path.display());
-                    fs::read_to_string(&config_path).ok()
-                })
-                .and_then(|content| toml::from_str::<SystemConfig>(&content).ok())
-                .and_then(|sys_config| sys_config.css_path)
-                .and_then(|css_str| {
-                    let config_dir = Path::new("/usr/share/fin");
-                    let path = config_dir.join(css_str);
-                    if path.exists() {
-                        info!("Using system-configured CSS at '{}'.", path.display());
-                        Some(path)
-                    } else {
-                        warn!("System-configured CSS '{}' does not exist.", path.display());
-                        None
-                    }
-                })
-        });
+    if css_path.exists() {
+        info!("Using CSS file at '{}'.", css_path.display());
+        Ok(Some(css_path))
+    } else {
+        info!("Default CSS not found. Checking system config.");
+        let system_config_path = env::var("FIN_SYSTEM_CONFIG")
+            .unwrap_or_else(|_| "/usr/share/fin/config.toml".to_string());
+        let system_config_content = fs::read_to_string(&system_config_path).ok();
+        let system_config = system_config_content
+            .and_then(|content| toml::from_str::<SystemConfig>(&content).ok())
+            .and_then(|config| config.css_path);
 
-    Ok(final_path.or_else(|| {
-        println!("Default CSS not found. Checking system config.");
-        warn!("No valid CSS file found. Falling back to GTK built-in style.");
-        None
-    }))
+        let system_css = system_config
+            .map(|css_str| {
+                let config_dir = Path::new("/usr/share/fin");
+                let path = config_dir.join(css_str);
+                if path.exists() {
+                    info!("Using system-configured CSS at '{}'.", path.display());
+                    Some(path)
+                } else {
+                    warn!("System-configured CSS '{}' does not exist.", path.display());
+                    None
+                }
+            })
+            .unwrap_or(None);
+        if system_css.is_none() {
+            warn!("No valid CSS file found. Falling back to GTK built-in style.");
+        }
+        Ok(system_css)
+    }
 }
 
+/// Structure representing the system configuration read from a TOML file.
 #[derive(Deserialize)]
 struct SystemConfig {
     #[serde(default, alias = "stylesheet")]
     css_path: Option<String>,
 }
 
+/// Loads the theme configuration and returns a CSS string that defines CSS custom properties.
 ///
-/// Loads the CSS file. If `use_gtk_theme` is true, no custom CSS is applied and the system theme remains.
-/// Otherwise, loads the specified CSS file and applies it with high priority.
-fn load_css(path: &Path, use_gtk_theme: bool) -> Result<()> {
-    if use_gtk_theme {
-        info!("use_gtk_theme is true; not applying custom CSS (using system theme).");
-        return Ok(());
-    }
-    let provider = CssProvider::new();
-    match fs::read(path) {
-        Ok(css_data) => {
-            let css_str = std::str::from_utf8(&css_data)
-                .with_context(|| format!("CSS file '{}' is not valid UTF-8", path.display()))?;
-            provider.load_from_string(css_str);
-            info!("Loaded CSS from '{}'", path.display());
-        }
-        Err(e) => {
-            warn!(
-                "Failed to read CSS file '{}': {}. Falling back to GTK built-in style.",
-                path.display(),
+/// The function attempts to load a user theme (from `$HOME/.config/fin/themes/<theme_name>.toml`)
+/// and falls back to the system theme (`/usr/share/fin/themes/<theme_name>.toml`) if needed.
+/// On error, it returns a fallback CSS string with default values.
+///
+/// # Parameters
+///
+/// - `config`: Reference to the main configuration which may specify the theme name.
+///
+/// # Returns
+///
+/// A `String` containing the CSS rules for the theme.
+fn get_theme_css(config: &Config) -> String {
+    let theme_name = config.theme.as_deref().unwrap_or("default");
+    let user_theme_path = dirs::config_dir()
+        .map(|p| {
+            p.join("fin")
+                .join("themes")
+                .join(format!("{}.toml", theme_name))
+        })
+        .filter(|p| p.exists());
+    let system_theme_path =
+        PathBuf::from("/usr/share/fin/themes").join(format!("{}.toml", theme_name));
+    let theme_path = user_theme_path.unwrap_or(system_theme_path);
+
+    load_theme(&theme_path)
+        .map(|theme| {
+            format!(
+                ":root {{
+                   --background: {};
+                   --foreground: {};
+                   --cursor-color: {};
+                   --cursor-text: {};
+                   --selection-background: {};
+                   --selection-foreground: {};
+                   --palette-0: {};
+                   --palette-1: {};
+                   --palette-2: {};
+                   --palette-3: {};
+                   --palette-4: {};
+                   --palette-5: {};
+                   --palette-6: {};
+                   --palette-7: {};
+                   --palette-8: {};
+                   --palette-9: {};
+                   --palette-10: {};
+                   --palette-11: {};
+                   --palette-12: {};
+                   --palette-13: {};
+                   --palette-14: {};
+                   --palette-15: {};
+                }}",
+                theme.background,
+                theme.foreground,
+                theme.cursor_color,
+                theme.cursor_text,
+                theme.selection_background,
+                theme.selection_foreground,
+                theme.palette0,
+                theme.palette1,
+                theme.palette2,
+                theme.palette3,
+                theme.palette4,
+                theme.palette5,
+                theme.palette6,
+                theme.palette7,
+                theme.palette8,
+                theme.palette9,
+                theme.palette10,
+                theme.palette11,
+                theme.palette12,
+                theme.palette13,
+                theme.palette14,
+                theme.palette15,
+            )
+        })
+        .unwrap_or_else(|e| {
+            error!(
+                "Error loading theme from path: {}: {:?}",
+                theme_path.display(),
                 e
             );
-            provider.load_from_string("");
-        }
-    }
-    let display =
-        gdk::Display::default().ok_or_else(|| anyhow!("Could not get default display"))?;
-    gtk4::style_context_add_provider_for_display(
-        &display,
-        &provider,
-        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
-    );
-    Ok(())
+            // Fallback defaults:
+            ":root {
+                   --background: rgba(35, 33, 54, 1);
+                   --foreground: rgba(224, 222, 244, 1);
+                   --cursor-color: rgba(224, 222, 244, 1);
+                   --cursor-text: rgba(35, 33, 54, 1);
+                   --selection-background: rgba(68, 65, 90, 1);
+                   --selection-foreground: rgba(224, 222, 244, 1);
+                   --palette-0: rgba(57, 53, 82, 1);
+                   --palette-1: rgba(235, 111, 146, 1);
+                   --palette-2: rgba(62, 143, 176, 1);
+                   --palette-3: rgba(246, 193, 119, 1);
+                   --palette-4: rgba(156, 207, 216, 1);
+                   --palette-5: rgba(196, 167, 231, 1);
+                   --palette-6: rgba(234, 154, 151, 1);
+                   --palette-7: rgba(224, 222, 244, 1);
+                   --palette-8: rgba(110, 106, 134, 1);
+                   --palette-9: rgba(235, 111, 146, 1);
+                   --palette-10: rgba(62, 143, 176, 1);
+                   --palette-11: rgba(246, 193, 119, 1);
+                   --palette-12: rgba(156, 207, 216, 1);
+                   --palette-13: rgba(196, 167, 231, 1);
+                   --palette-14: rgba(234, 154, 151, 1);
+                   --palette-15: rgba(224, 222, 244, 1);
+                }"
+            .to_string()
+        })
 }
 
-//
+// ------------------------------------------------------------
 // 2. Configuration Structures and Loading
-//
+// ------------------------------------------------------------
 
+/// Returns the default number of columns if none is specified.
 fn default_columns() -> usize {
     1
 }
 
+/// Custom deserializer that converts a standard `Vec` into an immutable `Vector`.
 fn deserialize_vector<'de, D, T>(deserializer: D) -> std::result::Result<Vector<T>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -183,10 +294,12 @@ where
     Ok(vec.into_iter().collect())
 }
 
+/// Returns the default value for the `use_gtk_theme` flag.
 fn default_use_gtk_theme() -> bool {
     false
 }
 
+/// Represents commands and button configuration for a specific desktop environment.
 #[derive(Deserialize, Debug, Clone)]
 struct DECommands {
     #[serde(default = "default_columns")]
@@ -194,6 +307,7 @@ struct DECommands {
     buttons: Vector<ButtonConfig>,
 }
 
+/// Represents layout configuration parameters for the application window.
 #[derive(Deserialize, Debug, Clone)]
 struct LayoutConfig {
     #[serde(default = "default_window_width_ratio")]
@@ -202,62 +316,94 @@ struct LayoutConfig {
     window_height_ratio: f64,
     #[serde(default = "default_button_font_ratio")]
     button_font_ratio: f64,
-    // Grid margins and spacing can be handled in CSS, so we omit them here.
 }
 
+/// Returns the default window width ratio.
 fn default_window_width_ratio() -> f64 {
     0.3
 }
+/// Returns the default window height ratio.
 fn default_window_height_ratio() -> f64 {
     0.3
 }
+/// Returns the default button font ratio.
 fn default_button_font_ratio() -> f64 {
     0.14
 }
 
+/// Main configuration structure loaded from the TOML configuration file.
 #[derive(Deserialize, Debug, Clone)]
 struct Config {
+    /// The title of the application window.
     title: String,
     #[serde(default = "default_columns")]
     columns: usize,
+    /// A list of button configurations.
     #[serde(default, deserialize_with = "deserialize_vector")]
     buttons: Vector<ButtonConfig>,
+    /// Flag indicating whether to use the system GTK theme.
     #[serde(default = "default_use_gtk_theme")]
     use_gtk_theme: bool,
+    /// Optional user-specified stylesheet path.
     #[serde(default, alias = "stylesheet")]
     css_path: Option<String>,
+    /// Default commands mapped by desktop environment.
     #[serde(default)]
     default_commands: HashMap<String, DECommands>,
+    /// Optional layout configuration.
     #[serde(default)]
     layout: Option<LayoutConfig>,
-    /// New field: the name of the theme to load (e.g., "default")
+    /// The name of the theme to load (e.g., "default").
     #[serde(default)]
     theme: Option<String>,
 }
 
+/// Represents the configuration for an individual button.
 #[derive(Deserialize, Debug, Clone)]
 struct ButtonConfig {
+    /// The label displayed on the button.
     label: String,
+    /// The command executed when the button is clicked.
     command: String,
 }
 
-/// Reads and parses the configuration file.
+/// Loads and parses the configuration file located at `path`.
+///
+/// # Parameters
+///
+/// - `path`: The path to the configuration file.
+///
+/// # Returns
+///
+/// A `Result` containing the parsed `Config` or an error with context including the file path.
 fn load_config(path: &Path) -> Result<Config> {
     info!("Loading config from {:?}", path);
     let config_content = fs::read_to_string(path)
-        .with_context(|| format!("Could not read config file {:?}", path))?;
+        .with_context(|| format!("Could not read config file at path: {:?}", path))?;
     info!("Config file content: {}", config_content);
-    let config: Config = toml::from_str(&config_content).context("TOML deserialization error")?;
+    let config: Config = toml::from_str(&config_content)
+        .context(format!("TOML deserialization error in file: {:?}", path))?;
     if config.columns == 0 {
         return Err(anyhow!(
-            "Invalid configuration: columns must be greater than 0"
+            "Invalid configuration in file {:?}: columns must be greater than 0",
+            path
         ));
     }
     Ok(config)
 }
-/// Returns (commands, columns) for the given desktop environment.
+
+/// Returns the desktop environment-specific commands and columns.
+/// If the desktop environment is not specifically configured, falls back to the default commands.
+///
+/// # Parameters
+///
+/// - `de`: The detected desktop environment.
+/// - `config`: The overall configuration.
+///
+/// # Returns
+///
+/// A tuple `(buttons, columns)`.
 fn get_commands_for_de(de: &str, config: &Config) -> (Vector<ButtonConfig>, usize) {
-    // Check if DE-specific commands exist in default_commands
     if let Some(de_cmd) = config.default_commands.get(de) {
         (de_cmd.buttons.clone(), de_cmd.columns)
     } else if let Some(default_cmd) = config.default_commands.get("default") {
@@ -267,10 +413,22 @@ fn get_commands_for_de(de: &str, config: &Config) -> (Vector<ButtonConfig>, usiz
     }
 }
 
-//
+// ------------------------------------------------------------
 // 3. UI and Navigation Functions
-//
+// ------------------------------------------------------------
 
+/// Creates an action button with the specified label and command.
+/// The button is styled with the "action-button" CSS class and shows a tooltip with the command.
+///
+/// # Parameters
+///
+/// - `app`: Reference to the GTK application.
+/// - `label`: The label for the button.
+/// - `command`: The command to execute when the button is clicked.
+///
+/// # Returns
+///
+/// A `Button` widget.
 fn create_action_button(app: &Application, label: &str, command: &str) -> Button {
     let button = Button::with_label(label);
     button.add_css_class("action-button");
@@ -283,7 +441,12 @@ fn create_action_button(app: &Application, label: &str, command: &str) -> Button
                 .arg("-c")
                 .arg(&command_string)
                 .spawn()
-                .with_context(|| format!("Failed to execute command '{}'", command_string))
+                .with_context(|| {
+                    format!(
+                        "Failed to execute command '{}' on button click",
+                        command_string
+                    )
+                })
             {
                 let err_msg = format!("Failed to execute command '{}': {}", command_string, e);
                 error!("{}", err_msg);
@@ -295,16 +458,19 @@ fn create_action_button(app: &Application, label: &str, command: &str) -> Button
     button
 }
 
+/// Displays an error message (currently by logging it).
 fn show_error_dialog(_app: &Application, message: &str) {
     error!("Error Notification: {}", message);
 }
 
+/// Sets up the focus chain by setting the first button as the focus child in the grid.
 fn setup_focus_chain(grid: &Grid, buttons: &Vector<Button>) {
     if let Some(first_button) = buttons.get(0) {
         grid.set_focus_child(Some(first_button));
     }
 }
 
+/// Sets up a focus controller for the window so that leaving focus causes the application to quit.
 fn setup_focus_controller(window: &ApplicationWindow, app: &Application) {
     let app_clone = app.clone();
     let focus_controller = EventControllerFocus::new();
@@ -314,6 +480,18 @@ fn setup_focus_controller(window: &ApplicationWindow, app: &Application) {
     window.add_controller(focus_controller);
 }
 
+/// Computes a new index for button focus when an arrow key is pressed.
+///
+/// # Parameters
+///
+/// - `current`: The current focused button index.
+/// - `total`: The total number of buttons.
+/// - `columns`: The number of columns in the grid.
+/// - `key`: The key that was pressed.
+///
+/// # Returns
+///
+/// The new index after applying the arrow key movement.
 fn new_index_for_arrow(current: usize, total: usize, columns: usize, key: gdk::Key) -> usize {
     match key {
         gdk::Key::Up | gdk::Key::KP_Up => current
@@ -338,6 +516,17 @@ fn new_index_for_arrow(current: usize, total: usize, columns: usize, key: gdk::K
     }
 }
 
+/// Computes a new index for button focus when the Tab key is pressed.
+///
+/// # Parameters
+///
+/// - `index`: The current index.
+/// - `total`: The total number of buttons.
+/// - `forward`: If true, moves forward; if false, moves backward.
+///
+/// # Returns
+///
+/// The new index after tabbing.
 fn calculate_new_index_for_tab(index: usize, total: usize, forward: bool) -> usize {
     if forward {
         (index + 1) % total
@@ -346,6 +535,14 @@ fn calculate_new_index_for_tab(index: usize, total: usize, forward: bool) -> usi
     }
 }
 
+/// Sets up key handlers for the window to handle navigation and button activation.
+///
+/// # Parameters
+///
+/// - `window`: The application window.
+/// - `app`: The GTK application.
+/// - `buttons`: A reference-counted vector of buttons.
+/// - `columns`: The number of columns in the grid.
 fn setup_key_handlers(
     window: &ApplicationWindow,
     app: &Application,
@@ -359,40 +556,53 @@ fn setup_key_handlers(
     }
     let current_index = Rc::new(Cell::new(0));
     let controller = EventControllerKey::new();
-    {
-        let app = app.clone();
-        let buttons = buttons.clone();
-        let current_index = current_index.clone();
-        controller.connect_key_pressed(move |_, key_value, _hardware_keycode, _state| {
-            let total = buttons.len();
-            let current = current_index.get();
-            let new_index = match key_value {
-                gdk::Key::Escape => {
-                    app.quit();
-                    return Propagation::Stop;
-                }
-                gdk::Key::Return => {
-                    if let Some(button) = buttons.get(current) {
-                        button.emit_clicked();
-                    }
-                    return Propagation::Stop;
-                }
-                gdk::Key::Tab => calculate_new_index_for_tab(current, total, true),
-                gdk::Key::ISO_Left_Tab => calculate_new_index_for_tab(current, total, false),
-                key => new_index_for_arrow(current, total, columns, key),
-            };
-            if new_index != current {
-                current_index.set(new_index);
-                if let Some(button) = buttons.get(new_index) {
-                    button.grab_focus();
-                }
+
+    // Clone necessary references.
+    let app_clone = app.clone();
+    let buttons_ref = Rc::clone(&buttons);
+    let current_index_clone = Rc::clone(&current_index);
+
+    controller.connect_key_pressed(move |_, key_value, _hardware_keycode, _state| {
+        let total = buttons_ref.len();
+        let current = current_index_clone.get();
+        let new_index = match key_value {
+            gdk::Key::Escape => {
+                app_clone.quit();
+                return Propagation::Stop;
             }
-            Propagation::Stop
-        });
-    }
+            gdk::Key::Return => {
+                if let Some(button) = buttons_ref.get(current) {
+                    button.emit_clicked();
+                }
+                return Propagation::Stop;
+            }
+            gdk::Key::Tab => calculate_new_index_for_tab(current, total, true),
+            gdk::Key::ISO_Left_Tab => calculate_new_index_for_tab(current, total, false),
+            key => new_index_for_arrow(current, total, columns, key),
+        };
+        if new_index != current {
+            current_index_clone.set(new_index);
+            if let Some(button) = buttons_ref.get(new_index) {
+                button.grab_focus();
+            }
+        }
+        Propagation::Stop
+    });
+
     window.add_controller(controller);
 }
 
+/// Composes a grid layout and attaches action buttons to it.
+///
+/// # Parameters
+///
+/// - `app`: The GTK application.
+/// - `buttons`: A vector of button configurations.
+/// - `columns`: The number of columns in the grid.
+///
+/// # Returns
+///
+/// A `Result` containing a tuple of the `Grid` widget and a vector of created `Button` widgets.
 fn compose_grid(
     app: &Application,
     buttons: &Vector<ButtonConfig>,
@@ -417,19 +627,29 @@ fn compose_grid(
     Ok((grid, all_buttons))
 }
 
+/// Creates a new `Grid` widget with default spacing and margins.
+///
+/// # Returns
+///
+/// A `Grid` widget.
 fn create_grid() -> Grid {
     Grid::builder()
         .column_homogeneous(true)
         .row_homogeneous(true)
-        .column_spacing(10)
-        .row_spacing(10)
-        .margin_top(20)
-        .margin_bottom(20)
-        .margin_start(20)
-        .margin_end(20)
+        .column_spacing(GRID_COLUMN_SPACING)
+        .row_spacing(GRID_ROW_SPACING)
+        .margin_top(GRID_MARGIN)
+        .margin_bottom(GRID_MARGIN)
+        .margin_start(GRID_MARGIN)
+        .margin_end(GRID_MARGIN)
         .build()
 }
 
+/// Detects the current desktop environment using the `XDG_CURRENT_DESKTOP` or `DESKTOP_SESSION` environment variables.
+///
+/// # Returns
+///
+/// A `String` representing the detected desktop environment (in lowercase).
 fn detect_desktop_environment() -> String {
     env::var("XDG_CURRENT_DESKTOP")
         .or_else(|_| env::var("DESKTOP_SESSION"))
@@ -441,10 +661,11 @@ fn detect_desktop_environment() -> String {
         .to_string()
 }
 
-//
+// ------------------------------------------------------------
 // 4. Theme Loading
-//
+// ------------------------------------------------------------
 
+/// Represents a theme with color palette and styling definitions.
 #[derive(Deserialize, Debug, Clone)]
 struct Theme {
     palette0: String,
@@ -471,17 +692,40 @@ struct Theme {
     selection_foreground: String,
 }
 
+/// Loads a theme from a TOML file located at `path`.
+///
+/// # Parameters
+///
+/// - `path`: The path to the theme file.
+///
+/// # Returns
+///
+/// A `Result` containing the loaded `Theme` or an error with context.
 fn load_theme<P: AsRef<Path>>(path: P) -> Result<Theme> {
     let content = fs::read_to_string(path.as_ref())
-        .with_context(|| format!("Could not read theme file {:?}", path.as_ref()))?;
-    let theme: Theme = toml::from_str(&content).with_context(|| "Theme deserialization error")?;
+        .with_context(|| format!("Could not read theme file at path: {:?}", path.as_ref()))?;
+    let theme: Theme = toml::from_str(&content)
+        .with_context(|| format!("Theme deserialization error in file: {:?}", path.as_ref()))?;
     Ok(theme)
 }
 
-//
+// ------------------------------------------------------------
 // 5. Building the UI
-//
+// ------------------------------------------------------------
 
+/// Builds the application UI by combining dynamic CSS, user CSS, and theme CSS.
+/// It creates the main window, applies the combined CSS, and sets up the grid layout and key handlers.
+///
+/// # Parameters
+///
+/// - `app`: The GTK application.
+/// - `config`: The application configuration.
+/// - `stylesheet_path`: An optional path to the user-provided stylesheet.
+/// - `buttons`: A vector of button configurations to display.
+///
+/// # Returns
+///
+/// A `Result` indicating success or failure.
 fn build_ui(
     app: &Application,
     config: &Config,
@@ -501,8 +745,8 @@ fn build_ui(
 
     let display =
         gdk::Display::default().ok_or_else(|| anyhow!("Could not get default display"))?;
-    let monitors = display.monitors();
-    let primary_monitor = monitors
+    let primary_monitor = display
+        .monitors()
         .item(0)
         .and_then(|obj| obj.downcast::<Monitor>().ok())
         .ok_or_else(|| anyhow!("Could not get primary monitor"))?;
@@ -528,128 +772,38 @@ fn build_ui(
     window.set_resizable(false);
     window.set_tooltip_text(Some("Finë logout manager window"));
 
-    // Generate dynamic CSS for responsive button font size.
-    let font_size = (window_height as f64 * layout.button_font_ratio) as i32;
-    let dynamic_css = format!(".action-button {{ font-size: {}px; }}", font_size);
-    let dynamic_provider = CssProvider::new();
-    dynamic_provider.load_from_string(&dynamic_css);
-    info!("Loaded dynamic CSS: {}", dynamic_css);
+    // Create dynamic CSS for responsive button font size.
+    let dynamic_css = format!(
+        ".action-button {{ font-size: {}px; }}",
+        (window_height as f64 * layout.button_font_ratio) as i32
+    );
+
+    // Conditionally read user CSS (unless using the GTK theme).
+    let user_css = (!config.use_gtk_theme)
+        .then(|| {
+            stylesheet_path
+                .as_ref()
+                .and_then(|path| fs::read_to_string(path).ok())
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+
+    // Get theme CSS via the helper function.
+    let theme_css = get_theme_css(config);
+
+    // Combine all CSS rules. The order determines precedence (later rules override earlier ones).
+    let combined_css = format!("{}\n{}\n{}", dynamic_css, user_css, theme_css);
+
+    // Create one CSS provider and load the combined CSS.
+    let provider = CssProvider::new();
+    provider.load_from_string(&combined_css);
     gtk4::style_context_add_provider_for_display(
         &display,
-        &dynamic_provider,
-        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
+        &provider,
+        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
 
-    // Load the user-specified or default stylesheet.
-    match stylesheet_path {
-        Some(ref css_path) => load_css(css_path, false)?,
-        None => load_css(&PathBuf::new(), true)?,
-    }
-
-    // Load theme from a separate theme file.
-    let theme_name = config.theme.as_deref().unwrap_or("default");
-    let user_theme_path = dirs::config_dir().map(|p| {
-        p.join("fin")
-            .join("themes")
-            .join(format!("{}.toml", theme_name))
-    });
-    let system_theme_path =
-        PathBuf::from("/usr/share/fin/themes").join(format!("{}.toml", theme_name));
-    let theme_path = if let Some(ref user_path) = user_theme_path {
-        if user_path.exists() {
-            user_path.clone()
-        } else {
-            system_theme_path
-        }
-    } else {
-        system_theme_path
-    };
-
-    let theme = load_theme(theme_path).unwrap_or_else(|e| {
-        error!("Error loading theme: {:?}", e);
-        // Fallback defaults:
-        Theme {
-            palette0: "rgba(57, 53, 82, 1)".into(),
-            palette1: "rgba(235, 111, 146, 1)".into(),
-            palette2: "rgba(62, 143, 176, 1)".into(),
-            palette3: "rgba(246, 193, 119, 1)".into(),
-            palette4: "rgba(156, 207, 216, 1)".into(),
-            palette5: "rgba(196, 167, 231, 1)".into(),
-            palette6: "rgba(234, 154, 151, 1)".into(),
-            palette7: "rgba(224, 222, 244, 1)".into(),
-            palette8: "rgba(110, 106, 134, 1)".into(),
-            palette9: "rgba(235, 111, 146, 1)".into(),
-            palette10: "rgba(62, 143, 176, 1)".into(),
-            palette11: "rgba(246, 193, 119, 1)".into(),
-            palette12: "rgba(156, 207, 216, 1)".into(),
-            palette13: "rgba(196, 167, 231, 1)".into(),
-            palette14: "rgba(234, 154, 151, 1)".into(),
-            palette15: "rgba(224, 222, 244, 1)".into(),
-            background: "rgba(35, 33, 54, 1)".into(),
-            foreground: "rgba(224, 222, 244, 1)".into(),
-            cursor_color: "rgba(224, 222, 244, 1)".into(),
-            cursor_text: "rgba(35, 33, 54, 1)".into(),
-            selection_background: "rgba(68, 65, 90, 1)".into(),
-            selection_foreground: "rgba(224, 222, 244, 1)".into(),
-        }
-    });
-
-    let theme_css = format!(
-        ":root {{
-               --background: {};
-               --foreground: {};
-               --cursor-color: {};
-               --cursor-text: {};
-               --selection-background: {};
-               --selection-foreground: {};
-               --palette-0: {};
-               --palette-1: {};
-               --palette-2: {};
-               --palette-3: {};
-               --palette-4: {};
-               --palette-5: {};
-               --palette-6: {};
-               --palette-7: {};
-               --palette-8: {};
-               --palette-9: {};
-               --palette-10: {};
-               --palette-11: {};
-               --palette-12: {};
-               --palette-13: {};
-               --palette-14: {};
-               --palette-15: {};
-            }}",
-        theme.background,
-        theme.foreground,
-        theme.cursor_color,
-        theme.cursor_text,
-        theme.selection_background,
-        theme.selection_foreground,
-        theme.palette0,
-        theme.palette1,
-        theme.palette2,
-        theme.palette3,
-        theme.palette4,
-        theme.palette5,
-        theme.palette6,
-        theme.palette7,
-        theme.palette8,
-        theme.palette9,
-        theme.palette10,
-        theme.palette11,
-        theme.palette12,
-        theme.palette13,
-        theme.palette14,
-        theme.palette15,
-    );
-    let theme_provider = CssProvider::new();
-    theme_provider.load_from_string(&theme_css);
-    gtk4::style_context_add_provider_for_display(
-        &display,
-        &theme_provider,
-        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION + 2,
-    );
-
+    // Build the UI grid and attach buttons.
     let (grid, all_buttons) = compose_grid(app, buttons, config.columns)?;
     setup_focus_chain(&grid, &all_buttons);
     let buttons_rc = Rc::new(all_buttons);
@@ -662,11 +816,14 @@ fn build_ui(
     Ok(())
 }
 
-//
+// ------------------------------------------------------------
 // 6. Main Entry Point
-//
+// ------------------------------------------------------------
 
+/// Main function that initializes logging, parses command-line arguments,
+/// loads the configuration, and launches the GTK application.
 fn main() -> Result<()> {
+    // Initialize logging as early as possible.
     env_logger::init();
 
     let matches = Command::new("fin")
@@ -683,11 +840,9 @@ fn main() -> Result<()> {
         .get_matches();
 
     if matches.contains_id("config") {
-        if matches.value_source("config").expect("checked contains_id") == ValueSource::CommandLine
-        {
-            info!("`config` set by user");
-        } else {
-            info!("`config` is defaulted");
+        match matches.value_source("config") {
+            Some(ValueSource::CommandLine) => info!("`config` set by user"),
+            _ => info!("`config` is defaulted"),
         }
     }
 
@@ -729,27 +884,30 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-//
+// ------------------------------------------------------------
 // Tests
-//
+// ------------------------------------------------------------
 #[cfg(test)]
 mod tests {
     use super::*;
     use anyhow::Result;
     use im::{hashmap, vector};
+    use log::info;
     use std::env;
     use std::fs;
     use std::path::{Path, PathBuf};
-    use std::sync::Once;
+    use std::sync::{Arc, Mutex, Once};
 
     static INIT: Once = Once::new();
+    /// Initializes the test environment and logger.
     fn init_env() {
         INIT.call_once(|| {
+            let _ = env_logger::builder().is_test(true).try_init();
             env::set_var("FIN_SYSTEM_CONFIG", "/nonexistent/path/config.toml");
         });
     }
 
-    /// Returns a dedicated temporary directory for our tests.
+    /// Returns a dedicated temporary directory for tests.
     fn get_temp_dir() -> Result<PathBuf> {
         let mut tmp = env::temp_dir();
         tmp.push("fin_test");
@@ -757,13 +915,14 @@ mod tests {
         Ok(tmp)
     }
 
-    /// Helper to remove a file (ignoring errors).
+    /// Helper function to remove a file, ignoring errors.
     fn remove_test_file(path: &Path) {
         let _ = fs::remove_file(path);
     }
 
     #[test]
     fn load_config_valid_file() -> Result<()> {
+        init_env();
         let tmp_dir = get_temp_dir()?;
         let config_path = tmp_dir.join("valid_config.toml");
         fs::write(
@@ -784,7 +943,9 @@ mod tests {
 
     #[test]
     fn test_select_css_path_missing_user_css_fallback_to_default() -> Result<()> {
+        init_env();
         let tmp_dir = get_temp_dir()?;
+        // Use unique filenames per iteration if running in a loop
         let config_path = tmp_dir.join("dummy_config.toml");
         fs::write(&config_path, "dummy config")?;
 
@@ -792,20 +953,15 @@ mod tests {
         let default_css = tmp_dir.join("default.css");
         fs::write(&default_css, "button { background-color: green; }")?;
 
-        println!("Config path: {:?}", config_path);
-        println!("Default CSS path: {:?}", default_css);
+        info!("Config path: {:?}", config_path);
+        info!("Default CSS path: {:?}", default_css);
 
         let result = select_css_path(user_css, &config_path, &default_css, false)?;
-        println!("Selected CSS path: {:?}", result);
+        info!("Selected CSS path: {:?}", result);
         assert_eq!(result, Some(default_css.clone()));
 
-        // Ensure files are removed only if they exist
-        if default_css.exists() {
-            fs::remove_file(&default_css)?;
-        }
-        if config_path.exists() {
-            fs::remove_file(&config_path)?;
-        }
+        remove_test_file(&default_css);
+        remove_test_file(&config_path);
         Ok(())
     }
 
@@ -864,7 +1020,7 @@ mod tests {
         init_env();
         let config = Config {
             title: "Test".to_string(),
-            columns: 1, // Base config columns (should be overridden)
+            columns: 1,
             buttons: vector![],
             use_gtk_theme: false,
             css_path: None,
@@ -885,10 +1041,9 @@ mod tests {
 
         let (commands, columns) = get_commands_for_de("unknown_de", &config);
 
-        // Verify both commands and columns
         assert_eq!(commands.len(), 1);
         assert_eq!(commands[0].label, "Default");
-        assert_eq!(columns, 2); // Should use default command's columns
+        assert_eq!(columns, 2);
     }
 
     #[test]
@@ -896,13 +1051,13 @@ mod tests {
         init_env();
         let config = Config {
             title: "Test".to_string(),
-            columns: 1, // Update to match the expected output
+            columns: 1,
             buttons: vector![],
             use_gtk_theme: false,
             css_path: None,
             default_commands: hashmap! {
                 "test_de".to_string() => DECommands {
-                    columns: 1, // Update to match the expected output
+                    columns: 1,
                     buttons: vector![
                         ButtonConfig {
                             label: "Test".to_string(),
@@ -916,54 +1071,8 @@ mod tests {
         };
         let (commands, columns) = get_commands_for_de("test_de", &config);
 
-        // Verify both commands and columns
         assert_eq!(commands.len(), 1);
-        assert_eq!(columns, 1); // Update to match the expected output
-    }
-
-    #[test]
-    fn test_load_css_file_exists() -> Result<()> {
-        init_env();
-        if gdk::Display::default().is_none() {
-            eprintln!("Skipping test_load_css_file_exists because no default display found");
-            return Ok(());
-        }
-        let tmp_dir = get_temp_dir()?;
-        let css_path = tmp_dir.join("test_style.css");
-        fs::write(&css_path, "button { background-color: blue; }")?;
-        let res = load_css(&css_path, false);
-        remove_test_file(&css_path);
-        assert!(res.is_ok());
-        Ok(())
-    }
-
-    #[test]
-    fn test_load_css_system_theme_fallback() -> Result<()> {
-        init_env();
-        if gdk::Display::default().is_none() {
-            eprintln!(
-                "Skipping test_load_css_system_theme_fallback because no default display found"
-            );
-            return Ok(());
-        }
-        let missing_path = PathBuf::from("this_file_should_not_exist.css");
-        let res = load_css(&missing_path, true);
-        assert!(res.is_ok());
-        Ok(())
-    }
-
-    #[test]
-    fn test_load_css_no_fallback() -> Result<()> {
-        init_env();
-        if gdk::Display::default().is_none() {
-            eprintln!("Skipping test_load_css_no_fallback because no default display found");
-            return Ok(());
-        }
-        let missing_path = PathBuf::from("this_file_should_not_exist.css");
-        let res = load_css(&missing_path, false);
-        // Even if the file doesn't exist, we fall back to built-in CSS.
-        assert!(res.is_ok());
-        Ok(())
+        assert_eq!(columns, 1);
     }
 
     #[test]
@@ -1023,7 +1132,6 @@ mod tests {
         fs::write(&default_css, "button { background-color: yellow; }")?;
 
         let result = select_css_path(user_css, &config_path, &default_css, true)?;
-        // When use_gtk_theme is true, our updated logic returns None.
         assert_eq!(result, None);
 
         remove_test_file(&default_css);
@@ -1034,17 +1142,13 @@ mod tests {
     #[test]
     fn test_user_config_precedence_and_css_selection() -> Result<()> {
         init_env();
-        // Create a temporary directory to simulate the user's home directory.
         let tmp_home = get_temp_dir()?.join("home");
         fs::create_dir_all(&tmp_home)?;
-        // Override HOME to point to our temporary home.
         env::set_var("HOME", &tmp_home);
 
-        // Create a user configuration directory: $HOME/.config/fin
         let user_config_dir = tmp_home.join(".config").join("fin");
         fs::create_dir_all(&user_config_dir)?;
 
-        // Write a user config file with a valid stylesheet reference.
         let user_config_content = r#"
     title = "Finë User Config"
     use_gtk_theme = false
@@ -1065,21 +1169,15 @@ mod tests {
         let user_config_path = user_config_dir.join("config.toml");
         fs::write(&user_config_path, user_config_content)?;
 
-        // Write a user stylesheet file in the same directory.
-        let user_css_content = "button { background-color: #ff0000; }";
         let user_css_path = user_config_dir.join("user_style.css");
-        fs::write(&user_css_path, user_css_content)?;
+        fs::write(&user_css_path, "button { background-color: #ff0000; }")?;
 
-        // When determine_config_path() is called, it should return the user config file.
         let determined_path = determine_config_path();
         assert_eq!(
             determined_path, user_config_path,
             "The user configuration should take precedence."
         );
 
-        // Now test select_css_path:
-        // We pass the stylesheet field from the config ("user_style.css"), the user_config_path,
-        // and a dummy system CSS path.
         let css_path = select_css_path(
             Some("user_style.css".to_string()),
             &user_config_path,
@@ -1094,37 +1192,16 @@ mod tests {
 
         Ok(())
     }
-}
-#[cfg(test)]
-mod ui_tests {
-    use super::*;
-    use anyhow::{anyhow, Result};
-    use gtk4::Application;
-    use im::{vector, HashMap};
-    use std::env;
-    use std::fs;
-    use std::path::{Path, PathBuf};
-    use std::sync::{Arc, Mutex, Once};
 
-    static INIT: Once = Once::new();
-    fn init_env() {
-        INIT.call_once(|| {
-            env::set_var("FIN_SYSTEM_CONFIG", "/nonexistent/path/config.toml");
-        });
-    }
-
-    /// Helper to create a temporary file with the given content.
     fn create_file(path: &Path, content: &str) -> Result<()> {
         fs::write(path, content)?;
         Ok(())
     }
 
-    /// Helper to remove a file (ignoring errors).
     fn remove_file(path: &Path) {
         let _ = fs::remove_file(path);
     }
 
-    /// Helper function to run build_ui inside a dummy GTK application.
     fn run_build_ui(config: Config, stylesheet_path: Option<PathBuf>) -> Result<()> {
         let app = Application::builder()
             .application_id("com.example.test.ui")
@@ -1155,7 +1232,6 @@ mod ui_tests {
         }
     }
 
-    /// Create a dummy configuration with column testing support
     fn dummy_config(css_path: Option<String>, use_gtk_theme: bool) -> Config {
         Config {
             title: "Test UI".to_string(),
@@ -1186,7 +1262,7 @@ mod ui_tests {
     fn test_build_ui_with_valid_css() -> Result<()> {
         init_env();
         if gdk::Display::default().is_none() {
-            eprintln!("Skipping test_build_ui_with_valid_css: no display available");
+            info!("Skipping test_build_ui_with_valid_css: no display available");
             return Ok(());
         }
         let tmp_dir = env::temp_dir();
@@ -1220,7 +1296,7 @@ mod ui_tests {
     fn test_build_ui_with_default_css() -> Result<()> {
         init_env();
         if gdk::Display::default().is_none() {
-            eprintln!("Skipping test_build_ui_with_default_css: no display available");
+            info!("Skipping test_build_ui_with_default_css: no display available");
             return Ok(());
         }
         let tmp_dir = env::temp_dir();
@@ -1251,7 +1327,7 @@ mod ui_tests {
     fn test_build_ui_with_columns() -> Result<()> {
         init_env();
         if gdk::Display::default().is_none() {
-            eprintln!("Skipping test_build_ui_with_columns: no display available");
+            info!("Skipping test_build_ui_with_columns: no display available");
             return Ok(());
         }
 
@@ -1296,7 +1372,7 @@ mod ui_tests {
     fn test_build_ui_with_fallback_css() -> Result<()> {
         init_env();
         if gdk::Display::default().is_none() {
-            eprintln!("Skipping test_build_ui_with_fallback_css: no display available");
+            info!("Skipping test_build_ui_with_fallback_css: no display available");
             return Ok(());
         }
         let tmp_dir = env::temp_dir();
