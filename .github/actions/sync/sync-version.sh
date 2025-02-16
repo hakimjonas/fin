@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
+# Allow git discovery across filesystem boundaries.
+export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
+
 # Ensure we're in the repository root.
 if [ -n "$GITHUB_WORKSPACE" ]; then
   cd "$GITHUB_WORKSPACE"
@@ -12,7 +15,7 @@ echo "🔄 Syncing Version and Updating Build Artifacts..."
 
 # 1. Use the provided TAG environment variable if available.
 if [[ -n "$TAG" ]]; then
-  # Allow the version to be provided with a leading 'v'
+  # Allow version to be provided with or without a leading 'v'.
   TAG_VERSION="${TAG#v}"
 else
   # 2. Otherwise, if a .git directory is available, try to get the latest tag.
@@ -21,7 +24,7 @@ else
   fi
 fi
 
-# 3. If TAG_VERSION is still empty, try to fallback to the version in Cargo.toml.
+# 3. If TAG_VERSION is still empty, try to fall back to Cargo.toml.
 if [[ -z "$TAG_VERSION" ]]; then
   echo "ℹ️ No valid git tag found. Falling back to Cargo.toml version."
   TAG_VERSION=$(grep '^version = ' Cargo.toml | head -n1 | sed 's/version = "\(.*\)"/\1/')
@@ -33,7 +36,7 @@ if [[ -z "$TAG_VERSION" ]]; then
   exit 1
 fi
 
-# 5. Validate that the version is a valid semantic version (allowing an optional 'v' prefix in input).
+# 5. Validate that the version is a valid semantic version.
 if ! [[ "$TAG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "❌ Invalid version format: '$TAG_VERSION'. Expected a semantic version (e.g., 0.2.0)."
   exit 1
@@ -53,7 +56,7 @@ else
 fi
 
 echo "📦 Updating Cargo.toml..."
-cargo install cargo-edit --debug || true  # Install cargo-edit if missing
+cargo install cargo-edit --debug || true
 cargo set-version "$TAG_VERSION"
 
 echo "📝 Updating package filenames in INSTALL.md..."
@@ -68,10 +71,7 @@ echo "✅ INSTALL.md updated with latest release version: ${TAG_VERSION}"
 # 7. Automatically update the CHANGELOG.md by overwriting it with a new entry for this release.
 CHANGELOG_FILE="CHANGELOG.md"
 NEW_ENTRY="## [$TAG_VERSION] - $(date +%Y-%m-%d)\n\n"
-
-# Determine the most recent published tag (normalize by stripping any leading 'v')
 LAST_TAG=$(git tag --sort=-v:refname | sed 's/^v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${TAG_VERSION}$" | head -n 1)
-
 if [[ -n "$LAST_TAG" ]]; then
   NEW_ENTRY+="### Changes since $LAST_TAG:\n"
   SUMMARY=$(git log "v${LAST_TAG}"..HEAD --merges --pretty=format:"- %s")
@@ -83,30 +83,36 @@ if [[ -n "$LAST_TAG" ]]; then
 else
   NEW_ENTRY+="No previous release found. (This is the first release.)\n"
 fi
-
 echo -e "$NEW_ENTRY" > "$CHANGELOG_FILE"
 echo "✅ CHANGELOG.md overwritten with new entry for version $TAG_VERSION."
 
 echo "🔨 Building project..."
 cargo build --release
 
-echo "📂 Contents of target/release:"
+echo "📂 Listing target/release contents:"
 ls -lh target/release
+
+# 8. Determine the binary to package.
+BIN_PATH="target/release/fin"
+if [ ! -f "$BIN_PATH" ]; then
+  echo "❌ 'fin' binary not found in target/release. Searching for an executable..."
+  BIN_PATH=$(find target/release -maxdepth 1 -type f -executable | head -n 1)
+  if [ -z "$BIN_PATH" ]; then
+    echo "❌ No executable found in target/release."
+    ls -lh target/release
+    exit 1
+  else
+    echo "✅ Found executable: $BIN_PATH"
+  fi
+fi
 
 echo "📦 Preparing packaging for version ${TAG_VERSION}..."
 mkdir -p target/package/{solus,arch,nix}
 
-# Copy binaries and assets into package directories
-if [ -f target/release/fin ]; then
-  cp target/release/fin target/package/solus/
-  cp target/release/fin target/package/arch/
-  cp target/release/fin target/package/nix/
-else
-  echo "❌ Error: target/release/fin not found."
-  ls -lh target/release
-  exit 1
-fi
-
+# Copy binary and assets into package directories.
+cp "$BIN_PATH" target/package/solus/
+cp "$BIN_PATH" target/package/arch/
+cp "$BIN_PATH" target/package/nix/
 cp -r assets target/package/solus/
 cp -r assets target/package/arch/
 cp -r assets target/package/nix/
