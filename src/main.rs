@@ -426,11 +426,15 @@ struct Config {
 
 /// Represents the configuration for an individual button.
 #[derive(Deserialize, Debug, Clone)]
-struct ButtonConfig {
-    /// The label displayed on the button.
-    label: String,
-    /// The command executed when the button is clicked.
-    command: String,
+pub struct ButtonConfig {
+    pub label: String,
+    pub command: String,
+    /// Optional list of extra CSS classes for styling.
+    #[serde(default)]
+    pub css_classes: Option<Vec<String>>,
+    /// Optional widget name (ID) for unique styling.
+    #[serde(default)]
+    pub widget_name: Option<String>,
 }
 
 // ---------------------------------------------------------------------
@@ -513,11 +517,25 @@ fn execute_command(command: &str) -> Result<()> {
 ///
 /// # Returns
 /// A `Button` widget.
-fn create_action_button(app: &Application, label: &str, command: &str) -> Button {
-    let button = Button::with_label(label);
+fn create_action_button(app: &Application, cfg: &ButtonConfig) -> Button {
+    let button = Button::with_label(&cfg.label);
+    // Apply a common CSS class for all action buttons.
     button.add_css_class("action-button");
-    button.set_tooltip_text(Some(&format!("Executes command: {}", command)));
-    let command_string = command.to_string();
+
+    // Add extra CSS classes if provided.
+    if let Some(classes) = &cfg.css_classes {
+        for class in classes {
+            button.add_css_class(class);
+        }
+    }
+
+    // Set the widget name for unique identification (e.g. "lock-button").
+    if let Some(name) = &cfg.widget_name {
+        button.set_widget_name(name);
+    }
+
+    button.set_tooltip_text(Some(&format!("Executes command: {}", cfg.command)));
+    let command_string = cfg.command.clone();
     let app_clone = app.clone();
     button.connect_clicked(move |_| {
         if let Err(e) = execute_command(&command_string) {
@@ -723,7 +741,7 @@ fn compose_grid(
         .iter()
         .enumerate()
         .map(|(index, cfg)| {
-            let button = create_action_button(app, &cfg.label, &cfg.command);
+            let button = create_action_button(app, cfg);
             let row = index / columns;
             let col = index % columns;
             grid.attach(&button, col as i32, row as i32, 1, 1);
@@ -1095,8 +1113,8 @@ mod tests {
                     buttons: vector![
                         ButtonConfig {
                             label : "Default".to_string(),
-                            command : "echo default".to_string()
-                        }
+                            command : "echo default".to_string(),
+                        css_classes: None,widget_name: None,}
                     ]
                 }
             },
@@ -1124,8 +1142,8 @@ mod tests {
                     buttons: vector![
                         ButtonConfig {
                             label : "Test".to_string(),
-                            command : "echo test".to_string()
-                        }
+                            command : "echo test".to_string(),
+                        css_classes: None,widget_name: None,}
                     ]
                 }
             },
@@ -1276,14 +1294,20 @@ mod tests {
                 ButtonConfig {
                     label: "Test1".to_string(),
                     command: "echo test1".to_string(),
+                    css_classes: None,
+                    widget_name: None,
                 },
                 ButtonConfig {
                     label: "Test2".to_string(),
                     command: "echo test2".to_string(),
+                    css_classes: None,
+                    widget_name: None,
                 },
                 ButtonConfig {
                     label: "Test3".to_string(),
                     command: "echo test3".to_string(),
+                    css_classes: None,
+                    widget_name: None,
                 }
             ],
             use_gtk_theme,
@@ -1359,23 +1383,33 @@ mod tests {
             buttons: vector![
                 ButtonConfig {
                     label: "1".into(),
-                    command: "".into()
+                    command: "".into(),
+                    css_classes: None,
+                    widget_name: None,
                 },
                 ButtonConfig {
                     label: "2".into(),
-                    command: "".into()
+                    command: "".into(),
+                    css_classes: None,
+                    widget_name: None,
                 },
                 ButtonConfig {
                     label: "3".into(),
-                    command: "".into()
+                    command: "".into(),
+                    css_classes: None,
+                    widget_name: None,
                 },
                 ButtonConfig {
                     label: "4".into(),
-                    command: "".into()
+                    command: "".into(),
+                    css_classes: None,
+                    widget_name: None,
                 },
                 ButtonConfig {
                     label: "5".into(),
-                    command: "".into()
+                    command: "".into(),
+                    css_classes: None,
+                    widget_name: None,
                 },
             ],
             use_gtk_theme: false,

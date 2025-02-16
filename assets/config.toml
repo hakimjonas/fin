@@ -5,9 +5,9 @@ theme = "default"
 stylesheet = "style.css"
 
 [layout]
-window_width_ratio = 0.3
-window_height_ratio = 0.3
-button_font_ratio = 0.12
+window_width_ratio = 0.3 # 30% of the screen width
+window_height_ratio = 0.3 # 30% of the screen height
+button_font_ratio = 0.12 # 12% of the screen height
 
 [default_commands]
 
@@ -15,79 +15,79 @@ button_font_ratio = 0.12
 [default_commands.hyprland]
 columns = 2
 buttons = [
-    { label = "󰌾", command = "hyprlock" },
-    { label = "󰍃", command = "hyprctl dispatch exit" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
+    { label = "󰌾", command = "hyprlock", css_classes = ["lock-button"], widget_name = "lock-button" },
+    { label = "󰍃", command = "hyprctl dispatch exit", css_classes = ["logout-button"], widget_name = "logout-button" },
+    { label = "󰜉", command = "systemctl reboot", css_classes = ["reboot-button"], widget_name = "reboot-button" },
+    { label = "󰐥", command = "systemctl poweroff", css_classes = ["poweroff-button"], widget_name = "poweroff-button" }
 ]
 
 # Sway: Locks screen, logs out, reboots, and powers off.
 [default_commands.sway]
 columns = 2
 buttons = [
-    { label = "󰌾", command = "swaylock -f -c 000000" },
-    { label = "󰍃", command = "swaymsg exit" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
+    { label = "󰌾", command = "swaylock -f -c 000000", css_classes = ["lock-button"], widget_name = "lock-button" },
+    { label = "󰍃", command = "swaymsg exit", css_classes = ["logout-button"], widget_name = "logout-button" },
+    { label = "󰜉", command = "systemctl reboot", css_classes = ["reboot-button"], widget_name = "reboot-button" },
+    { label = "󰐥", command = "systemctl poweroff", css_classes = ["poweroff-button"], widget_name = "poweroff-button" }
 ]
 
 # i3: Locks screen, logs out, reboots, and powers off.
 [default_commands.i3]
 columns = 2
 buttons = [
-    { label = "󰌾", command = "i3lock -c 000000" },
-    { label = "󰍃", command = "i3-msg exit" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
+    { label = "󰌾", command = "i3lock -c 000000", css_classes = ["lock-button"], widget_name = "lock-button" },
+    { label = "󰍃", command = "i3-msg exit", css_classes = ["logout-button"], widget_name = "logout-button" },
+    { label = "󰜉", command = "systemctl reboot", css_classes = ["reboot-button"], widget_name = "reboot-button" },
+    { label = "󰐥", command = "systemctl poweroff", css_classes = ["poweroff-button"], widget_name = "poweroff-button" }
 ]
 
 # GNOME: Locks screen, logs out, reboots, and powers off.
 [default_commands.gnome]
 columns = 2
 buttons = [
-    { label = "󰌾", command = "dbus-send --type=method_call --dest=org.gnome.ScreenSaver /org/gnome/ScreenSaver org.gnome.ScreenSaver.Lock" },
-    { label = "󰍃", command = "gnome-session-quit --logout" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
+    { label = "󰌾", command = "dbus-send --type=method_call --dest=org.gnome.ScreenSaver /org/gnome/ScreenSaver org.gnome.ScreenSaver.Lock", css_classes = ["lock-button"], widget_name = "lock-button" },
+    { label = "󰍃", command = "gnome-session-quit --logout", css_classes = ["logout-button"], widget_name = "logout-button" },
+    { label = "󰜉", command = "systemctl reboot", css_classes = ["reboot-button"], widget_name = "reboot-button" },
+    { label = "󰐥", command = "systemctl poweroff", css_classes = ["poweroff-button"], widget_name = "poweroff-button" }
 ]
 
 # Budgie: Locks screen, logs out, reboots, and powers off.
 [default_commands.budgie]
 columns = 2
 buttons = [
-    { label = "󰌾", command = "budgie-screensaver lock" },
-    { label = "󰍃", command = "budgie-session-quit --logout" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
+    { label = "󰌾", command = "budgie-screensaver lock", css_classes = ["lock-button"], widget_name = "lock-button" },
+    { label = "󰍃", command = "budgie-session-quit --logout", css_classes = ["logout-button"], widget_name = "logout-button" },
+    { label = "󰜉", command = "systemctl reboot", css_classes = ["reboot-button"], widget_name = "reboot-button" },
+    { label = "󰐥", command = "systemctl poweroff", css_classes = ["poweroff-button"], widget_name = "poweroff-button" }
 ]
 
 # XFCE: Locks screen, logs out, reboots, and powers off.
 [default_commands.xfce]
 columns = 2
 buttons = [
-    { label = "󰌾", command = "xflock4" },
-    { label = "󰍃", command = "xfce4-session-logout --logout" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
+    { label = "󰌾", command = "xflock4", css_classes = ["lock-button"], widget_name = "lock-button" },
+    { label = "󰍃", command = "xfce4-session-logout --logout", css_classes = ["logout-button"], widget_name = "logout-button" },
+    { label = "󰜉", command = "systemctl reboot", css_classes = ["reboot-button"], widget_name = "reboot-button" },
+    { label = "󰐥", command = "systemctl poweroff", css_classes = ["poweroff-button"], widget_name = "poweroff-button" }
 ]
 
 # COSMIC: Suspends, locks screen, logs out, reboots, and powers off.
 [default_commands.cosmic]
 columns = 2
 buttons = [
-    { label = "󰤄", command = "systemctl suspend" },
-    { label = "󰌾", command = "loginctl lock-session" },
-    { label = "󰍃", command = "loginctl terminate-session $XDG_SESSION_ID" },
-    { label = "󰜉", command = "systemctl reboot" },
-    { label = "󰐥", command = "systemctl poweroff" }
+    { label = "󰤄", command = "systemctl suspend", css_classes = ["suspend-button"], widget_name = "suspend-button" },
+    { label = "󰌾", command = "loginctl lock-session", css_classes = ["lock-button"], widget_name = "lock-button" },
+    { label = "󰍃", command = "loginctl terminate-session $XDG_SESSION_ID", css_classes = ["logout-button"], widget_name = "logout-button" },
+    { label = "󰜉", command = "systemctl reboot", css_classes = ["reboot-button"], widget_name = "reboot-button" },
+    { label = "󰐥", command = "systemctl poweroff", css_classes = ["poweroff-button"], widget_name = "poweroff-button" }
 ]
 
 # Common commands (fallback)
 [default_commands.common]
 columns = 2
 buttons = [
-    { label = "Lock", command = "loginctl lock-session" },
-    { label = "Logout", command = "loginctl terminate-session $XDG_SESSION_ID" },
-    { label = "Reboot", command = "systemctl reboot" },
-    { label = "Poweroff", command = "systemctl poweroff" }
+    { label = "Lock", command = "loginctl lock-session", css_classes = ["lock-button"], widget_name = "lock-button" },
+    { label = "Logout", command = "loginctl terminate-session $XDG_SESSION_ID", css_classes = ["logout-button"], widget_name = "logout-button" },
+    { label = "Reboot", command = "systemctl reboot", css_classes = ["reboot-button"], widget_name = "reboot-button" },
+    { label = "Poweroff", command = "systemctl poweroff", css_classes = ["poweroff-button"], widget_name = "poweroff-button" }
 ]

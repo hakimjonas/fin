@@ -78,6 +78,35 @@ button:focus:active {
 }
 
 
+/* Specific active state for Lock button */
+button#lock-button:active > label,
+button#lock-button:active:focus > label,
+button#lock-button:focus:active > label {
+    color: var(--palette7);
+}
+
+/* Specific active state for Logout button */
+button#logout-button:active > label,
+button#logout-button:active:focus > label,
+button#logout-button:focus:active > label {
+    color: var(--palette8);
+}
+
+/* Specific active state for Reboot button */
+button#reboot-button:active > label,
+button#reboot-button:active:focus > label,
+button#reboot-button:focus:active > label {
+    color: var(--palette9);
+}
+
+/* Specific active state for Poweroff button */
+button#poweroff-button:active > label,
+button#poweroff-button:active:focus > label,
+button#poweroff-button:focus:active > label {
+    color: var(--palette6);
+}
+
+
 .popup-text {
     background: var(--background);
     color: var(--foreground);
