@@ -12,7 +12,7 @@ echo "🔄 Syncing Version and Updating Build Artifacts..."
 
 # 1. Use the provided TAG environment variable if available.
 if [[ -n "$TAG" ]]; then
-  # Strip a leading 'v' if it exists.
+  # Allow the version to be provided with a leading 'v'
   TAG_VERSION="${TAG#v}"
 else
   # 2. Otherwise, if a .git directory is available, try to get the latest tag.
@@ -21,14 +21,19 @@ else
   fi
 fi
 
-# 3. If TAG_VERSION is still empty, then error out.
+# 3. If TAG_VERSION is still empty, try to fallback to the version in Cargo.toml.
 if [[ -z "$TAG_VERSION" ]]; then
-  echo "❌ No version provided via TAG and no valid git tag found."
-  echo "Please supply a valid semantic version (e.g., 0.2.0) either via the workflow input or by ensuring the repository has a valid git tag."
+  echo "ℹ️ No valid git tag found. Falling back to Cargo.toml version."
+  TAG_VERSION=$(grep '^version = ' Cargo.toml | head -n1 | sed 's/version = "\(.*\)"/\1/')
+fi
+
+# 4. If TAG_VERSION is still empty, then error out.
+if [[ -z "$TAG_VERSION" ]]; then
+  echo "❌ No version provided via TAG, no valid git tag found, and Cargo.toml version is empty."
   exit 1
 fi
 
-# 4. Validate that the version is a valid semantic version (e.g., 0.2.0).
+# 5. Validate that the version is a valid semantic version (allowing an optional 'v' prefix in input).
 if ! [[ "$TAG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "❌ Invalid version format: '$TAG_VERSION'. Expected a semantic version (e.g., 0.2.0)."
   exit 1
@@ -36,7 +41,7 @@ fi
 
 echo "📌 Current version: $TAG_VERSION"
 
-# 5. If no TAG was provided via the environment, automatically increment the patch version.
+# 6. If no TAG was provided via the environment, automatically increment the patch version.
 if [[ -z "$TAG" ]]; then
   IFS='.' read -r major minor patch <<< "$TAG_VERSION"
   new_patch=$((patch + 1))
@@ -60,7 +65,7 @@ sed -i -E "s/fin_[0-9]+\.[0-9]+\.[0-9]+_amd64\.deb/fin_${TAG_VERSION}_amd64.deb/
 
 echo "✅ INSTALL.md updated with latest release version: ${TAG_VERSION}"
 
-# 6. Automatically update the CHANGELOG.md by overwriting it with a new entry for this release.
+# 7. Automatically update the CHANGELOG.md by overwriting it with a new entry for this release.
 CHANGELOG_FILE="CHANGELOG.md"
 NEW_ENTRY="## [$TAG_VERSION] - $(date +%Y-%m-%d)\n\n"
 
