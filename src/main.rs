@@ -176,6 +176,7 @@ fn select_css_path(
         Ok(load_system_css(default_css))
     }
 }
+
 /// Structure representing the system configuration read from a TOML file.
 #[derive(Deserialize)]
 struct SystemConfig {
@@ -183,19 +184,143 @@ struct SystemConfig {
     css_path: Option<String>,
 }
 
-/// Loads the theme configuration and returns a CSS string that defines CSS custom properties.
+// ---------------------------------------------------------------------
+// Theme Loading (Refactored for GTK UI Action Buttons)
+// ---------------------------------------------------------------------
+
+use std::error::Error;
+
+/// A type‑safe, immutable representation of the theme colors.
+/// The TOML file is expected to use hyphenated keys.
+#[derive(Debug, Deserialize)]
+pub struct ThemeColors {
+    #[serde(rename = "palette0")]
+    pub palette0: String, // Base
+    #[serde(rename = "palette1")]
+    pub palette1: String, // Surface
+    #[serde(rename = "palette2")]
+    pub palette2: String, // Overlay
+    #[serde(rename = "palette3")]
+    pub palette3: String, // Muted
+    #[serde(rename = "palette4")]
+    pub palette4: String, // Subtle
+    #[serde(rename = "palette5")]
+    pub palette5: String, // Text
+    #[serde(rename = "palette6")]
+    pub palette6: String, // Love
+    #[serde(rename = "palette7")]
+    pub palette7: String, // Gold
+    #[serde(rename = "palette8")]
+    pub palette8: String, // Rose
+    #[serde(rename = "palette9")]
+    pub palette9: String, // Pine
+    #[serde(rename = "palette10")]
+    pub palette10: String, // Foam
+    #[serde(rename = "palette11")]
+    pub palette11: String, // Iris
+    #[serde(rename = "palette12")]
+    pub palette12: String, // Highlight Low
+    #[serde(rename = "palette13")]
+    pub palette13: String, // Highlight Med
+    #[serde(rename = "palette14")]
+    pub palette14: String, // Highlight High
+    #[serde(rename = "palette15")]
+    pub palette15: String, // Highlight Text
+
+    #[serde(rename = "background")]
+    pub background: String, // Window background
+    #[serde(rename = "foreground")]
+    pub foreground: String, // Window foreground
+
+    #[serde(rename = "button-focus-text")]
+    pub button_focus_text: String, // Button focus text color
+    #[serde(rename = "button-focus-background")]
+    pub button_focus_background: String, // Button focus background
+    #[serde(rename = "button-hover-background")]
+    pub button_hover_background: String, // Button hover background
+    #[serde(rename = "button-hover-text")]
+    pub button_hover_text: String, // Button hover text
+    #[serde(rename = "button-normal-background")]
+    pub button_normal_background: String, // Normal button background
+}
+
+/// Loads the theme colors from a TOML file at the given path.
+/// TOML supports headers and comments by default.
+pub fn load_theme_colors<P: AsRef<Path>>(path: P) -> Result<ThemeColors, Box<dyn Error>> {
+    let content = fs::read_to_string(path)?;
+    let theme: ThemeColors = toml::from_str(&content)?;
+    Ok(theme)
+}
+
+/// Generates a CSS string that maps the theme colors to CSS custom properties
+/// using names tailored for a GTK UI with action buttons.
+/// Generates a CSS string that maps the theme colors to CSS custom properties,
+/// using hyphenated variable names that directly correspond to the keys in the theme file.
+pub fn generate_theme_css(theme: &ThemeColors) -> String {
+    format!(
+        ":root {{
+  --palette0: {};
+  --palette1: {};
+  --palette2: {};
+  --palette3: {};
+  --palette4: {};
+  --palette5: {};
+  --palette6: {};
+  --palette7: {};
+  --palette8: {};
+  --palette9: {};
+  --palette10: {};
+  --palette11: {};
+  --palette12: {};
+  --palette13: {};
+  --palette14: {};
+  --palette15: {};
+
+  --background: {};
+  --foreground: {};
+
+  --button-focus-text: {};
+  --button-focus-background: {};
+  --button-hover-background: {};
+  --button-hover-text: {};
+  --button-normal-background: {};
+}}
+button {{
+  background: var(--button-normal-background);
+  color: var(--button-focus-text);
+}}
+",
+        theme.palette0,
+        theme.palette1,
+        theme.palette2,
+        theme.palette3,
+        theme.palette4,
+        theme.palette5,
+        theme.palette6,
+        theme.palette7,
+        theme.palette8,
+        theme.palette9,
+        theme.palette10,
+        theme.palette11,
+        theme.palette12,
+        theme.palette13,
+        theme.palette14,
+        theme.palette15,
+        theme.background,
+        theme.foreground,
+        theme.button_focus_text,
+        theme.button_focus_background,
+        theme.button_hover_background,
+        theme.button_hover_text,
+        theme.button_normal_background,
+    )
+}
+
+/// Loads the theme configuration and returns a CSS string containing the custom properties.
 ///
-/// The function attempts to load a user theme (from `$HOME/.config/fin/themes/<theme_name>.toml`)
+/// It attempts to load a user theme (from `$HOME/.config/fin/themes/<theme_name>.toml`)
 /// and falls back to the system theme (`/usr/share/fin/themes/<theme_name>.toml`) if needed.
-/// On error, it returns a fallback CSS string with default values.
-///
-/// # Parameters
-///
-/// - `config`: Reference to the main configuration which may specify the theme name.
-///
-/// # Returns
-///
-/// A `String` containing the CSS rules for the theme.
+/// On error, it returns an empty CSS string.
 fn get_theme_css(config: &Config) -> String {
     let theme_name = config.theme.as_deref().unwrap_or("default");
     let user_theme_path = dirs::config_dir()
@@ -208,89 +333,11 @@ fn get_theme_css(config: &Config) -> String {
     let system_theme_path = PathBuf::from(SYSTEM_THEME_DIR).join(format!("{}.toml", theme_name));
     let theme_path = user_theme_path.unwrap_or(system_theme_path);
 
-    load_theme(&theme_path)
-        .map(|theme| {
-            format!(
-                ":root {{
-                   --background: {};
-                   --foreground: {};
-                   --cursor-color: {};
-                   --cursor-text: {};
-                   --selection-background: {};
-                   --selection-foreground: {};
-                   --palette-0: {};
-                   --palette-1: {};
-                   --palette-2: {};
-                   --palette-3: {};
-                   --palette-4: {};
-                   --palette-5: {};
-                   --palette-6: {};
-                   --palette-7: {};
-                   --palette-8: {};
-                   --palette-9: {};
-                   --palette-10: {};
-                   --palette-11: {};
-                   --palette-12: {};
-                   --palette-13: {};
-                   --palette-14: {};
-                   --palette-15: {};
-                }}",
-                theme.background,
-                theme.foreground,
-                theme.cursor_color,
-                theme.cursor_text,
-                theme.selection_background,
-                theme.selection_foreground,
-                theme.palette0,
-                theme.palette1,
-                theme.palette2,
-                theme.palette3,
-                theme.palette4,
-                theme.palette5,
-                theme.palette6,
-                theme.palette7,
-                theme.palette8,
-                theme.palette9,
-                theme.palette10,
-                theme.palette11,
-                theme.palette12,
-                theme.palette13,
-                theme.palette14,
-                theme.palette15,
-            )
-        })
+    load_theme_colors(&theme_path)
+        .map(|theme| generate_theme_css(&theme))
         .unwrap_or_else(|e| {
-            error!(
-                "Error loading theme from path: {}: {:?}",
-                theme_path.display(),
-                e
-            );
-            // Fallback defaults:
-            ":root {
-                   --background: rgba(35, 33, 54, 1);
-                   --foreground: rgba(224, 222, 244, 1);
-                   --cursor-color: rgba(224, 222, 244, 1);
-                   --cursor-text: rgba(35, 33, 54, 1);
-                   --selection-background: rgba(68, 65, 90, 1);
-                   --selection-foreground: rgba(224, 222, 244, 1);
-                   --palette-0: rgba(57, 53, 82, 1);
-                   --palette-1: rgba(235, 111, 146, 1);
-                   --palette-2: rgba(62, 143, 176, 1);
-                   --palette-3: rgba(246, 193, 119, 1);
-                   --palette-4: rgba(156, 207, 216, 1);
-                   --palette-5: rgba(196, 167, 231, 1);
-                   --palette-6: rgba(234, 154, 151, 1);
-                   --palette-7: rgba(224, 222, 244, 1);
-                   --palette-8: rgba(110, 106, 134, 1);
-                   --palette-9: rgba(235, 111, 146, 1);
-                   --palette-10: rgba(62, 143, 176, 1);
-                   --palette-11: rgba(246, 193, 119, 1);
-                   --palette-12: rgba(156, 207, 216, 1);
-                   --palette-13: rgba(196, 167, 231, 1);
-                   --palette-14: rgba(234, 154, 151, 1);
-                   --palette-15: rgba(224, 222, 244, 1);
-                }"
-            .to_string()
+            error!("Error loading theme from {}: {:?}", theme_path.display(), e);
+            String::new()
         })
 }
 
@@ -351,7 +398,7 @@ fn default_button_font_ratio() -> f64 {
 }
 
 /// Main configuration structure loaded from the TOML configuration file.
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Default)]
 struct Config {
     /// The title of the application window.
     title: String,
@@ -476,7 +523,6 @@ fn create_action_button(app: &Application, label: &str, command: &str) -> Button
         if let Err(e) = execute_command(&command_string) {
             let err_msg = format!("Failed to execute command '{}': {}", command_string, e);
             error!("{}", err_msg);
-            // Now showing an error dialog instead of just logging.
             show_error_dialog(&app_clone, &err_msg);
         }
         app_clone.quit();
@@ -724,50 +770,8 @@ fn detect_desktop_environment() -> String {
 }
 
 // ---------------------------------------------------------------------
-// Theme Loading
+// (Old Theme Loading section removed in favor of the new ThemeColors)
 // ---------------------------------------------------------------------
-
-/// Represents a theme with a color palette and styling definitions.
-#[derive(Deserialize, Debug, Clone)]
-struct Theme {
-    palette0: String,
-    palette1: String,
-    palette2: String,
-    palette3: String,
-    palette4: String,
-    palette5: String,
-    palette6: String,
-    palette7: String,
-    palette8: String,
-    palette9: String,
-    palette10: String,
-    palette11: String,
-    palette12: String,
-    palette13: String,
-    palette14: String,
-    palette15: String,
-    background: String,
-    foreground: String,
-    cursor_color: String,
-    cursor_text: String,
-    selection_background: String,
-    selection_foreground: String,
-}
-
-/// Loads a theme from a TOML file located at `path`.
-///
-/// # Parameters
-/// - `path`: The path to the theme file.
-///
-/// # Returns
-/// A `Result` containing the loaded `Theme` or an error with context.
-fn load_theme<P: AsRef<Path>>(path: P) -> Result<Theme> {
-    let content = fs::read_to_string(path.as_ref())
-        .with_context(|| format!("Could not read theme file at path: {:?}", path.as_ref()))?;
-    let theme: Theme = toml::from_str(&content)
-        .with_context(|| format!("Theme deserialization error in file: {:?}", path.as_ref()))?;
-    Ok(theme)
-}
 
 // ---------------------------------------------------------------------
 // Building the UI
@@ -1090,8 +1094,8 @@ mod tests {
                     columns: 2,
                     buttons: vector![
                         ButtonConfig {
-                            label: "Default".to_string(),
-                            command: "echo default".to_string()
+                            label : "Default".to_string(),
+                            command : "echo default".to_string()
                         }
                     ]
                 }
@@ -1119,8 +1123,8 @@ mod tests {
                     columns: 1,
                     buttons: vector![
                         ButtonConfig {
-                            label: "Test".to_string(),
-                            command: "echo test".to_string()
+                            label : "Test".to_string(),
+                            command : "echo test".to_string()
                         }
                     ]
                 }
@@ -1407,5 +1411,26 @@ mod tests {
         let res = run_build_ui(config.clone(), stylesheet_path);
         assert!(res.is_ok());
         Ok(())
+    }
+    #[test]
+    fn test_css_variables_are_correctly_interpreted() {
+        init_env();
+        gtk4::init().expect("Failed to initialize GTK");
+        let css = r#"
+        :root {
+            --button-normal-background: red;
+            --button-normal-text: white;
+        }
+        button {
+            background-color: var(--button-normal-background);
+            color: var(--button-normal-text);
+        }
+        "#;
+        let provider = CssProvider::new();
+        provider.load_from_bytes(&glib::Bytes::from(css.as_bytes()));
+
+        let css_data = provider.to_str();
+        assert!(css_data.contains("--button-normal-background: red;"));
+        assert!(css_data.contains("--button-normal-text: white;"));
     }
 }

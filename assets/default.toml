@@ -1,23 +1,28 @@
-# Finë Theme: Default
-palette0 = "rgba(57, 53, 82, 1)"
-palette1 = "rgba(235, 111, 146, 1)"
-palette2 = "rgba(62, 143, 176, 1)"
-palette3 = "rgba(246, 193, 119, 1)"
-palette4 = "rgba(156, 207, 216, 1)"
-palette5 = "rgba(196, 167, 231, 1)"
-palette6 = "rgba(234, 154, 151, 1)"
-palette7 = "rgba(224, 222, 244, 1)"
-palette8 = "rgba(110, 106, 134, 1)"
-palette9 = "rgba(235, 111, 146, 1)"
-palette10 = "rgba(62, 143, 176, 1)"
-palette11 = "rgba(246, 193, 119, 1)"
-palette12 = "rgba(156, 207, 216, 1)"
-palette13 = "rgba(196, 167, 231, 1)"
-palette14 = "rgba(234, 154, 151, 1)"
-palette15 = "rgba(224, 222, 244, 1)"
-background = "rgba(35, 33, 54, 1)"
-foreground = "rgba(224, 222, 244, 1)"
-cursor_color = "rgba(224, 222, 244, 1)"
-cursor_text = "rgba(35, 33, 54, 1)"
-selection_background = "rgba(68, 65, 90, 1)"
-selection_foreground = "rgba(224, 222, 244, 1)"
+# Finë Theme Configuration for GTK Action Buttons
+
+palette0 = "#232136"    # Base
+palette1 = "#2a273f"    # Surface
+palette2 = "#393552"    # Overlay
+palette3 = "#6e6a86"    # Muted
+palette4 = "#908caa"    # Subtle
+palette5 = "#e0def4"    # Text
+palette6 = "#eb6f92"    # Love
+palette7 = "#f6c177"    # Gold
+palette8 = "#ea9a97"    # Rose
+palette9 = "#3e8fb0"    # Pine
+palette10 = "#9ccfd8"   # Foam
+palette11 = "#c4a7e7"   # Iris
+palette12 = "#2a283e"   # Highlight Low
+palette13 = "#44415a"   # Highlight Med
+palette14 = "#56526e"   # Highlight High
+palette15 = "#2a273f"   # Highlight Text
+
+background = "#232136"          # Window background
+foreground = "#e0def4"          # Window foreground
+
+button-focus-text = "#e0def4"        # Button focus text color
+button-focus-background = "#6e6a86"   # Button focus background
+button-hover-background = "#44415a"   # Button hover background
+button-hover-text = "#232136"         # Button hover text
+button-normal-background = "#393552"  # Normal button background
+button-normal-text = "#e0def4"         # Normal button text color

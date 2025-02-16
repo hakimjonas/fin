@@ -1,91 +1,148 @@
-/* Finë Default Stylesheet
-   This stylesheet uses CSS variables for theming. The variables are injected dynamically
-   from the theme.toml file (e.g., via Rust code). If these variables are not defined,
-   the UI will show broken styling, alerting the user that the theme is missing or misconfigured.
+﻿/* Finë Modern Default Stylesheet
+   This stylesheet uses CSS variables for theming.
+   These variables are injected dynamically from the theme.toml file (via Rust code).
 
-   CSS Variable Descriptions:
-     --background:             The window's background color.
-     --foreground:             The primary text color used in buttons and labels.
-     --cursor-color:           The color of the cursor.
-     --cursor-text:            The color of any text displayed on the cursor.
-     --selection-background:   The background color for selected text.
-     --selection-foreground:   The text color for selected text.
+   The following CSS custom properties are defined:
 
-     --palette-0 to --palette-15:
-       A palette of colors used for various UI elements (e.g., button backgrounds, hover states, etc.).
-       For example:
-            --palette-0:          Typically used as the default button background.
-            --palette-1:          Secondary color, etc.
-            --palette-2:          Used for hover states.
-            --palette-3:          Used for active states.
-            --palette-4:          Used for borders.
-            --palette-5:          Used for text.
-            --palette-6:          Used for text shadows.
-            --palette-7:          Used for box shadows.
-            --palette-8:          Used for selection background.
-            --palette-9:          Used for selection foreground.
-            --palette-10:         Used for the cursor.
-            --palette-11:         Used for the cursor text.
-            --palette-12:         Used for the window border.
-            --palette-13:         Used for the grid padding.
-            --palette-14:         Used for the grid background.
-            --palette-15:         Used for the grid border.
+   Palette Variables:
+     --palette0           : from palette0 (Base)
+     --palette1           : from palette1 (Surface)
+     --palette2           : from palette2 (Overlay)
+     --palette3           : from palette3 (Muted)
+     --palette4           : from palette4 (Subtle)
+     --palette5           : from palette5 (Text)
+     --palette6           : from palette6 (Love)
+     --palette7           : from palette7 (Gold)
+     --palette8           : from palette8 (Rose)
+     --palette9           : from palette9 (Pine)
+     --palette10          : from palette10 (Foam)
+     --palette11          : from palette11 (Iris)
+     --palette12          : from palette12 (Highlight Low)
+     --palette13          : from palette13 (Highlight Med)
+     --palette14          : from palette14 (Highlight High)
+     --palette15          : from palette15 (Highlight Text)
+
+   UI-Specific Colors:
+     --background         : from background (Window background)
+     --foreground         : from foreground (Window foreground)
+
+   Button Colors:
+     --button-normal-background : from button-normal-background (Normal button background)
+     --button-normal-text       : from button-normal-text (Normal button text color)
+     --button-focus-background  : from button-focus-background (Button focus background)
+     --button-focus-text        : from button-focus-text (Button focus text color)
+     --button-hover-background  : from button-hover-background (Button hover background)
+     --button-hover-text        : from button-hover-text (Button hover text)
+
+   Ensure that your theme.toml file defines all these keys accordingly.
 */
 
+/* Finë Modern Default Stylesheet */
 :root {
-    /* These variables should be defined by the dynamic theme injection.
-       If missing, the UI will not render correctly. */
+    /* These variables are injected dynamically by the application */
 }
 
+/* Modern Button Styles */
 button {
-    background: var(--palette-0);
-    color: var(--foreground);
+    outline: none;
+    background: var(--button-normal-background);
+    color: var(--button-normal-text);
     font-family: "Mononoki Nerd Font", monospace;
-    /* Font size is dynamically injected based on the window height; this is a fallback. */
-    font-size: 72px;
-    border-radius: 7px;
+    font-size: 48px;
     border: none;
-    padding: 2px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-    transition: background 0.3s ease, color 0.3s ease,
-    box-shadow 0.3s ease, text-shadow 0.3s ease;
+    padding: 12px 24px;
+    border-radius: 10px;
+    transition: background-color 0.7s ease, box-shadow 0.5s ease, transform 0.3s ease;
+    transform: scale(1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-button:hover {
-    background: var(--palette-2);
-    color: var(--foreground);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+button:hover,
+button:active:hover {
+    background: var(--button-hover-background);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px) scale(1.02);
 }
 
 button:focus {
-    outline: none;
-    border: 1px solid var(--foreground);
-    background: var(--palette-2);
-    color: var(--foreground);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    background: var(--button-focus-background);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
 }
 
 button:active,
-button:active:focus {
-    background: var(--palette-3);
-    color: var(--foreground);
-    outline: 2px solid var(--foreground);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+button:active:focus,
+button:focus:active {
+    background: var(--palette12);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25); /* Smaller shadow for pressed state */
+    transform: scale(0.95);
 }
 
+
+.popup-text {
+    background: var(--background);
+    color: var(--foreground);
+    padding: 6px 10px;
+    border: 1px solid var(--palette4); /* using a subtle tone */
+    border-radius: 6px;
+    font-size: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    opacity: 0; /* hidden by default */
+    transform: translateY(5px); /* slight slide effect */
+}
+
+/* Example: show popup when button is hovered or focused */
+button:hover .popup-text,
+button:focus .popup-text {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Modern Window Styles */
 window {
     background: var(--background);
-    border: 0 solid var(--palette-0);
-    padding: 2px;
-    border-radius: 11px;
+    border: none;
+    padding: 8px;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
 }
 
+window:hover {
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+    transform: translateY(-3px);
+}
+
+/* Grid Styles */
 grid {
-    padding: 1px;
+    padding: 4px;
+    transition: background 0.3s ease;
 }
 
-/* Additional styles can be added here as needed */
+/* Animations */
+body {
+    animation: fadeIn 2s ease-in forwards;
+    opacity: 0;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+body.fade-out {
+    animation: fadeOut 2s ease-out forwards;
+}
