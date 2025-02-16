@@ -10,12 +10,18 @@ fi
 
 echo "🔄 Syncing Version and Updating Build Artifacts..."
 echo "📂 Current working directory: $(pwd)"
+echo "GITHUB_REF: ${GITHUB_REF}"
+echo "GITHUB_REF_NAME: ${GITHUB_REF_NAME}"
 
-# If TAG is not provided, try to use GITHUB_REF.
-if [[ -z "$TAG" && -n "$GITHUB_REF" ]]; then
-  # GITHUB_REF for a tag push is typically refs/tags/v0.2.5
-  TAG="${GITHUB_REF##*/}"
-  echo "🔍 Using tag from GITHUB_REF: $TAG"
+# If TAG is not provided, try to use GITHUB_REF or GITHUB_REF_NAME.
+if [[ -z "$TAG" ]]; then
+  if [[ -n "$GITHUB_REF" ]]; then
+    TAG="${GITHUB_REF##*/}"
+    echo "🔍 Using tag from GITHUB_REF: $TAG"
+  elif [[ -n "$GITHUB_REF_NAME" ]]; then
+    TAG="$GITHUB_REF_NAME"
+    echo "🔍 Using tag from GITHUB_REF_NAME: $TAG"
+  fi
 fi
 
 # 1. Use the provided TAG environment variable if available.
@@ -49,7 +55,7 @@ fi
 
 echo "📌 Current version: $TAG_VERSION"
 
-# 6. If no TAG was provided via the environment (manual tag push), automatically increment the patch version.
+# 6. If no TAG was provided via the environment, automatically increment the patch version.
 # (If TAG was provided, we assume it's a manual release and use it as-is.)
 if [[ -z "$TAG" ]]; then
   IFS='.' read -r major minor patch <<< "$TAG_VERSION"
@@ -80,7 +86,6 @@ NEW_ENTRY="## [$TAG_VERSION] - $(date +%Y-%m-%d)\n\n"
 
 if [ -d ".git" ]; then
   echo "🔍 .git directory found. Generating changelog summary..."
-  # Normalize tags by stripping leading 'v' and sort semantically.
   LAST_TAG=$(git tag --sort=-v:refname | sed 's/^v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${TAG_VERSION}$" | head -n 1)
   if [[ -n "$LAST_TAG" ]]; then
     NEW_ENTRY+="### Changes since $LAST_TAG:\n"
