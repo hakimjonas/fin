@@ -2,7 +2,9 @@
 set -e
 
 # Ensure we're in the repository root.
-if git rev-parse --show-toplevel >/dev/null 2>&1; then
+if [ -n "$GITHUB_WORKSPACE" ]; then
+  cd "$GITHUB_WORKSPACE"
+elif git rev-parse --show-toplevel >/dev/null 2>&1; then
   cd "$(git rev-parse --show-toplevel)"
 fi
 
@@ -83,13 +85,23 @@ echo "✅ CHANGELOG.md overwritten with new entry for version $TAG_VERSION."
 echo "🔨 Building project..."
 cargo build --release
 
+echo "📂 Contents of target/release:"
+ls -lh target/release
+
 echo "📦 Preparing packaging for version ${TAG_VERSION}..."
 mkdir -p target/package/{solus,arch,nix}
 
 # Copy binaries and assets into package directories
-cp target/release/fin target/package/solus/
-cp target/release/fin target/package/arch/
-cp target/release/fin target/package/nix/
+if [ -f target/release/fin ]; then
+  cp target/release/fin target/package/solus/
+  cp target/release/fin target/package/arch/
+  cp target/release/fin target/package/nix/
+else
+  echo "❌ Error: target/release/fin not found."
+  ls -lh target/release
+  exit 1
+fi
+
 cp -r assets target/package/solus/
 cp -r assets target/package/arch/
 cp -r assets target/package/nix/
