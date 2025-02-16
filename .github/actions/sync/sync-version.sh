@@ -1,53 +1,25 @@
 #!/usr/bin/env bash
 set -e
 
-# Ensure we're in the repository root.
-if [ -n "$GITHUB_WORKSPACE" ]; then
-  cd "$GITHUB_WORKSPACE"
-elif git rev-parse --show-toplevel >/dev/null 2>&1; then
-  cd "$(git rev-parse --show-toplevel)"
-fi
-
 echo "🔄 Syncing Version and Updating Build Artifacts..."
-echo "📂 Current working directory: $(pwd)"
-echo "GITHUB_REF: ${GITHUB_REF}"
-echo "GITHUB_REF_NAME: ${GITHUB_REF_NAME}"
-
-# If TAG is not provided, try to use GITHUB_REF or GITHUB_REF_NAME.
-if [[ -z "$TAG" ]]; then
-  if [[ -n "$GITHUB_REF" ]]; then
-    TAG="${GITHUB_REF##*/}"
-    echo "🔍 Using tag from GITHUB_REF: $TAG"
-  elif [[ -n "$GITHUB_REF_NAME" ]]; then
-    TAG="$GITHUB_REF_NAME"
-    echo "🔍 Using tag from GITHUB_REF_NAME: $TAG"
-  fi
-fi
 
 # 1. Use the provided TAG environment variable if available.
 if [[ -n "$TAG" ]]; then
-  # Allow the version to be provided with a leading 'v'
+  # Strip a leading 'v' if it exists.
   TAG_VERSION="${TAG#v}"
-else
-  # 2. Otherwise, if a .git directory is available, try to get the latest tag.
-  if [ -d ".git" ]; then
-    TAG_VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
-  fi
+# 2. Otherwise, if a .git directory is available, try to get the latest tag.
+elif [ -d ".git" ]; then
+  TAG_VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
 fi
 
-# 3. If TAG_VERSION is still empty, try to fallback to the version in Cargo.toml.
+# 3. If TAG_VERSION is still empty, then error out.
 if [[ -z "$TAG_VERSION" ]]; then
-  echo "ℹ️ No valid git tag found. Falling back to Cargo.toml version."
-  TAG_VERSION=$(grep -E '^\s*version\s*=\s*".+"' Cargo.toml | head -n1 | sed -E 's/^\s*version\s*=\s*"([^"]+)".*/\1/')
-fi
-
-# 4. If TAG_VERSION is still empty, then error out.
-if [[ -z "$TAG_VERSION" ]]; then
-  echo "❌ No version provided via TAG, no valid git tag found, and Cargo.toml version is empty."
+  echo "❌ No version provided via TAG and no valid git tag found."
+  echo "Please supply a valid semantic version (e.g., 0.2.0) either via the workflow input or by ensuring the repository has a valid git tag."
   exit 1
 fi
 
-# 5. Validate that the version is a valid semantic version.
+# 4. Validate that the version is a valid semantic version (e.g., 0.2.0).
 if ! [[ "$TAG_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "❌ Invalid version format: '$TAG_VERSION'. Expected a semantic version (e.g., 0.2.0)."
   exit 1
@@ -55,17 +27,12 @@ fi
 
 echo "📌 Current version: $TAG_VERSION"
 
-# 6. If no TAG was provided via the environment, automatically increment the patch version.
-# (If TAG was provided, we assume it's a manual release and use it as-is.)
-if [[ -z "$TAG" ]]; then
-  IFS='.' read -r major minor patch <<< "$TAG_VERSION"
-  new_patch=$((patch + 1))
-  NEW_VERSION="${major}.${minor}.${new_patch}"
-  echo "🔼 Bumping patch version: $TAG_VERSION -> $NEW_VERSION"
-  TAG_VERSION="$NEW_VERSION"
-else
-  echo "🔼 Using provided version without bump: $TAG_VERSION"
-fi
+# 5. Automatically increment the patch version.
+IFS='.' read -r major minor patch <<< "$TAG_VERSION"
+new_patch=$((patch + 1))
+NEW_VERSION="${major}.${minor}.${new_patch}"
+echo "🔼 Bumping patch version: $TAG_VERSION -> $NEW_VERSION"
+TAG_VERSION="$NEW_VERSION"
 
 echo "📦 Updating Cargo.toml..."
 cargo install cargo-edit --debug || true  # Install cargo-edit if missing
@@ -80,51 +47,35 @@ sed -i -E "s/fin_[0-9]+\.[0-9]+\.[0-9]+_amd64\.deb/fin_${TAG_VERSION}_amd64.deb/
 
 echo "✅ INSTALL.md updated with latest release version: ${TAG_VERSION}"
 
-# 7. Update CHANGELOG.md.
+# 6. Overwrite CHANGELOG.md with a new entry.
 CHANGELOG_FILE="CHANGELOG.md"
 NEW_ENTRY="## [$TAG_VERSION] - $(date +%Y-%m-%d)\n\n"
-
-if [ -d ".git" ]; then
-  echo "🔍 .git directory found. Generating changelog summary..."
-  LAST_TAG=$(git tag --sort=-v:refname | sed 's/^v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${TAG_VERSION}$" | head -n 1)
-  if [[ -n "$LAST_TAG" ]]; then
-    NEW_ENTRY+="### Changes since $LAST_TAG:\n"
-    SUMMARY=$(git log "v${LAST_TAG}"..HEAD --merges --pretty=format:"- %s" || true)
-    if [[ -n "$SUMMARY" ]]; then
-      NEW_ENTRY+="$SUMMARY\n"
-    else
-      NEW_ENTRY+="No merged PRs found.\n"
-    fi
+# Determine the most recent published tag (normalize by stripping any leading 'v')
+LAST_TAG=$(git tag --sort=-v:refname | sed 's/^v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${TAG_VERSION}$" | head -n 1)
+if [[ -n "$LAST_TAG" ]]; then
+  NEW_ENTRY+="### Changes since $LAST_TAG:\n"
+  SUMMARY=$(git log "v${LAST_TAG}"..HEAD --merges --pretty=format:"- %s" || true)
+  if [[ -n "$SUMMARY" ]]; then
+    NEW_ENTRY+="$SUMMARY\n"
   else
-    NEW_ENTRY+="No previous release found. (This is the first release.)\n"
+    NEW_ENTRY+="No merged PRs found.\n"
   fi
 else
-  echo "⚠️ .git directory not found. Skipping git-based changelog summary."
-  NEW_ENTRY+="No git repository found. Manual changelog entry required.\n"
+  NEW_ENTRY+="No previous release found. (This is the first release.)\n"
 fi
-
 echo -e "$NEW_ENTRY" > "$CHANGELOG_FILE"
 echo "✅ CHANGELOG.md overwritten with new entry for version $TAG_VERSION."
 
 echo "🔨 Building project..."
 cargo build --release
 
-echo "📂 Contents of target/release:"
-ls -lh target/release
-
 echo "📦 Preparing packaging for version ${TAG_VERSION}..."
 mkdir -p target/package/{solus,arch,nix}
 
-if [ -f target/release/fin ]; then
-  cp target/release/fin target/package/solus/
-  cp target/release/fin target/package/arch/
-  cp target/release/fin target/package/nix/
-else
-  echo "❌ Error: target/release/fin not found."
-  ls -lh target/release
-  exit 1
-fi
-
+# Copy binaries and assets into package directories
+cp target/release/fin target/package/solus/
+cp target/release/fin target/package/arch/
+cp target/release/fin target/package/nix/
 cp -r assets target/package/solus/
 cp -r assets target/package/arch/
 cp -r assets target/package/nix/
