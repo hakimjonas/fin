@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
+# Ensure we're in the repository root.
+if git rev-parse --show-toplevel >/dev/null 2>&1; then
+  cd "$(git rev-parse --show-toplevel)"
+fi
+
 echo "🔄 Syncing Version and Updating Build Artifacts..."
 
 # 1. Use the provided TAG environment variable if available.
@@ -75,6 +80,11 @@ fi
 echo -e "$NEW_ENTRY" > "$CHANGELOG_FILE"
 echo "✅ CHANGELOG.md overwritten with new entry for version $TAG_VERSION."
 
+echo "🔨 Building project..."
+cargo build --release
+
+echo "📦 Preparing packaging for version ${TAG_VERSION}..."
+mkdir -p target/package/{solus,arch,nix}
 
 # Copy binaries and assets into package directories
 cp target/release/fin target/package/solus/
