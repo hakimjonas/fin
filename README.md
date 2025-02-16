@@ -22,15 +22,15 @@ reliable, and free from typographical misadventures.
 
 ![default-style](https://github.com/user-attachments/assets/f99f3644-8822-4c3a-8e70-d0379ca28e32)
 
-The default css - not claiming to be a css artist just wanted to provide a simply non ugly default. Colors are borrowed
-from the famous [Catppuccin](https://catppuccin.com/) theme.
+The default css - not claiming to be a css artist just wanted to provide a simple and clean style. In is current form it 
+uses [Rose Pine Moon](https://rosepinetheme.com/) color scheme.
 
 ## Dependencies
 
 To build and run Finë, you need to have the following dependencies installed:
 
 - **Rust**: Version 1.56 or later. You can install Rust using [rustup](https://rustup.rs/).
-- **GTK4**: Version 4.9 or later (recommended for best results).
+-  **GTK4**: Version 10 or later is recommended for the best experience.
 
 ## Installation
 
