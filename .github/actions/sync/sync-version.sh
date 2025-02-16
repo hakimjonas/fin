@@ -11,6 +11,13 @@ fi
 echo "🔄 Syncing Version and Updating Build Artifacts..."
 echo "📂 Current working directory: $(pwd)"
 
+# If TAG is not provided, try to use GITHUB_REF.
+if [[ -z "$TAG" && -n "$GITHUB_REF" ]]; then
+  # GITHUB_REF for a tag push is typically refs/tags/v0.2.5
+  TAG="${GITHUB_REF##*/}"
+  echo "🔍 Using tag from GITHUB_REF: $TAG"
+fi
+
 # 1. Use the provided TAG environment variable if available.
 if [[ -n "$TAG" ]]; then
   # Allow the version to be provided with a leading 'v'
@@ -42,7 +49,8 @@ fi
 
 echo "📌 Current version: $TAG_VERSION"
 
-# 6. If no TAG was provided, automatically increment the patch version.
+# 6. If no TAG was provided via the environment (manual tag push), automatically increment the patch version.
+# (If TAG was provided, we assume it's a manual release and use it as-is.)
 if [[ -z "$TAG" ]]; then
   IFS='.' read -r major minor patch <<< "$TAG_VERSION"
   new_patch=$((patch + 1))
