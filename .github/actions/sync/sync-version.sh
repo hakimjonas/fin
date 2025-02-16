@@ -9,6 +9,7 @@ elif git rev-parse --show-toplevel >/dev/null 2>&1; then
 fi
 
 echo "🔄 Syncing Version and Updating Build Artifacts..."
+echo "📂 Current working directory: $(pwd)"
 
 # 1. Use the provided TAG environment variable if available.
 if [[ -n "$TAG" ]]; then
@@ -24,7 +25,7 @@ fi
 # 3. If TAG_VERSION is still empty, try to fallback to the version in Cargo.toml.
 if [[ -z "$TAG_VERSION" ]]; then
   echo "ℹ️ No valid git tag found. Falling back to Cargo.toml version."
-  TAG_VERSION=$(grep '^version = ' Cargo.toml | head -n1 | sed 's/version = "\(.*\)"/\1/')
+  TAG_VERSION=$(grep -E '^\s*version\s*=\s*".+"' Cargo.toml | head -n1 | sed -E 's/^\s*version\s*=\s*"([^"]+)".*/\1/')
 fi
 
 # 4. If TAG_VERSION is still empty, then error out.
@@ -69,13 +70,12 @@ echo "✅ INSTALL.md updated with latest release version: ${TAG_VERSION}"
 CHANGELOG_FILE="CHANGELOG.md"
 NEW_ENTRY="## [$TAG_VERSION] - $(date +%Y-%m-%d)\n\n"
 
-# Only attempt git-based changelog summary if a .git directory exists.
 if [ -d ".git" ]; then
+  echo "🔍 .git directory found. Generating changelog summary..."
   # Normalize tags by stripping leading 'v' and sort semantically.
   LAST_TAG=$(git tag --sort=-v:refname | sed 's/^v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${TAG_VERSION}$" | head -n 1)
   if [[ -n "$LAST_TAG" ]]; then
     NEW_ENTRY+="### Changes since $LAST_TAG:\n"
-    # Use the provided tag for git log range (adding back a leading "v").
     SUMMARY=$(git log "v${LAST_TAG}"..HEAD --merges --pretty=format:"- %s" || true)
     if [[ -n "$SUMMARY" ]]; then
       NEW_ENTRY+="$SUMMARY\n"
@@ -86,10 +86,10 @@ if [ -d ".git" ]; then
     NEW_ENTRY+="No previous release found. (This is the first release.)\n"
   fi
 else
+  echo "⚠️ .git directory not found. Skipping git-based changelog summary."
   NEW_ENTRY+="No git repository found. Manual changelog entry required.\n"
 fi
 
-# Overwrite CHANGELOG.md with the new entry.
 echo -e "$NEW_ENTRY" > "$CHANGELOG_FILE"
 echo "✅ CHANGELOG.md overwritten with new entry for version $TAG_VERSION."
 
@@ -102,7 +102,6 @@ ls -lh target/release
 echo "📦 Preparing packaging for version ${TAG_VERSION}..."
 mkdir -p target/package/{solus,arch,nix}
 
-# Copy binaries and assets into package directories.
 if [ -f target/release/fin ]; then
   cp target/release/fin target/package/solus/
   cp target/release/fin target/package/arch/
