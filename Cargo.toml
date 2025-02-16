@@ -20,6 +20,10 @@ toml = "0.8.20"
 clap = { version = "4.5.28", features = ["derive"] }
 log = "0.4.25"
 env_logger = "0.11.6"
+dirs = "6.0.0"
+serde_yaml = "0.9.34"
+plist = "1.7.0"
+tempfile = "3.16.0"
 
 [profile.release]
 opt-level = "z"

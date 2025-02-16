@@ -1,0 +1,28 @@
+# Finë Theme Configuration for GTK Action Buttons
+
+palette0 = "#232136"    # Base
+palette1 = "#2a273f"    # Surface
+palette2 = "#393552"    # Overlay
+palette3 = "#6e6a86"    # Muted
+palette4 = "#908caa"    # Subtle
+palette5 = "#e0def4"    # Text
+palette6 = "#eb6f92"    # Love
+palette7 = "#f6c177"    # Gold
+palette8 = "#ea9a97"    # Rose
+palette9 = "#3e8fb0"    # Pine
+palette10 = "#9ccfd8"   # Foam
+palette11 = "#c4a7e7"   # Iris
+palette12 = "#2a283e"   # Highlight Low
+palette13 = "#44415a"   # Highlight Med
+palette14 = "#56526e"   # Highlight High
+palette15 = "#2a273f"   # Highlight Text
+
+background = "#232136"          # Window background
+foreground = "#e0def4"          # Window foreground
+
+button-focus-text = "#e0def4"        # Button focus text color
+button-focus-background = "#6e6a86"   # Button focus background
+button-hover-background = "#44415a"   # Button hover background
+button-hover-text = "#232136"         # Button hover text
+button-normal-background = "#393552"  # Normal button background
+button-normal-text = "#e0def4"         # Normal button text color
