@@ -4,23 +4,41 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_call:
-    inputs:
-      tag:
-        description: 'Semantic version (e.g., 0.2.0). Leave blank to use Git tag fallback.'
-        required: false
-        type: string
-        default: ""
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Semantic version (e.g., 0.2.0). Leave blank to use Git tag fallback.'
-        required: false
-        type: string
-        default: ""
+  pull_request:
+
+env:
+  NODE_VERSION: '22'
 
 jobs:
+  sync-version:
+    runs-on: ubuntu-latest
+    env:
+      GDK_BACKEND: wayland
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-edit
+        run: cargo install cargo-edit
+
+      - name: Sync Version
+        uses: ./.github/actions/sync
+        with:
+          tag: ${{ github.ref_name }}
+
   build:
+    needs: sync-version
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.container }}
     strategy:
       fail-fast: false
       matrix:
@@ -41,80 +59,75 @@ jobs:
             package_task: nix
             container: ubuntu:latest
             artifact_path: target/*-nix.tar.gz
-
-    runs-on: ubuntu-latest
-    container:
-      image: ${{ matrix.container }}
-      options: --entrypoint ""
     env:
-      # Pass the workflow input (if any) into the script.
-      TAG: ${{ inputs.tag }}
-
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
-          persist-credentials: false
 
       - name: Validate tag input
-        if: inputs.tag != ''
+        if: ${{ github.event.inputs.tag != '' }}
         shell: bash
         run: |
-          # Check if the input tag matches semantic versioning pattern (with optional 'v' prefix)
-          if [[ ! "${{ inputs.tag }}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?(\+[a-zA-Z0-9]+)?$ ]]; then
-            echo "❌ Invalid semantic version provided: ${{ inputs.tag }}"
-            echo "Please use the format 'X.Y.Z' or 'vX.Y.Z' (with optional pre-release/build metadata)."
+          if [[ ! "${{ github.event.inputs.tag }}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?(\+[a-zA-Z0-9]+)?$ ]]; then
+            echo "❌ Invalid semantic version provided: ${{ github.event.inputs.tag }}"
             exit 1
           fi
 
-      - name: Verify GitHub Actions Sync Directory
+      - name: Verify Sync Action Directory
         run: |
           echo "Current Directory: $(pwd)"
-          echo "Checking .github/actions/sync:"
-          ls -la .github/actions/sync || echo "Sync action directory missing!"
-          find . -name "action.yml" || echo "action.yml not found!"
+          echo "Listing .github/actions/sync:"
+          ls -la .github/actions/sync
 
-
-      - name: Install system dependencies (including Git)
+      - name: Install system dependencies
         run: |
           case "${{ matrix.distro }}" in
             ubuntu)
-              apt-get update && apt-get install -y curl libgtk-4-dev build-essential pkg-config git
+              apt-get update && apt-get install -y curl libgtk-4-dev build-essential pkg-config git dpkg-deb
+              curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+              apt-get install -y nodejs
               ;;
             arch)
               pacman -Syu --noconfirm curl gtk4 base-devel pkgconf git
+              pacman -S --noconfirm nodejs npm
               ;;
             solus)
-              eopkg up -y
-              eopkg it -y curl libgtk-4-devel gcc git
+              eopkg up -y && eopkg it -y curl libgtk-4-devel gcc git
+              eopkg it -y nodejs
               ;;
             nix)
               apt-get update && apt-get install -y curl build-essential pkg-config libglib2.0-dev libgtk-4-dev git
+              curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+              apt-get install -y nodejs
               ;;
           esac
 
-      # Install Rust (and Cargo) so they're available for the sync script and subsequent steps.
-      - name: Install Rust
+      - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Ensure sync-version script is executable
-        run: chmod +x ./.github/actions/sync/sync-version.sh
-        shell: bash
-
-      - name: Sync Version
-        run: ./.github/actions/sync/sync-version.sh
-        shell: bash
 
       - name: Install cargo-make
         run: cargo install cargo-make
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - name: Build project
         run: cargo build --release
 
       - name: Run tests
-        run: cargo test
+        run: cargo test --release
 
       - name: Package
         run: cargo make package-${{ matrix.package_task }}
@@ -125,7 +138,14 @@ jobs:
           ls -la $(dirname "${{ matrix.artifact_path }}") || true
 
       - name: Upload artifacts
+        if: ${{ !env.ACT }}
         uses: actions/upload-artifact@v4
         with:
           name: fin-${{ matrix.distro }}-${{ github.ref_name }}
           path: ${{ matrix.artifact_path }}
+
+      - name: Upload artifacts locally
+        if: ${{ env.ACT }}
+        run: |
+          echo "Uploading artifacts locally..."
+          # Add your local upload logic here

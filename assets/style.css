@@ -96,7 +96,7 @@ button#logout-button:focus:active > label {
 button#reboot-button:active > label,
 button#reboot-button:active:focus > label,
 button#reboot-button:focus:active > label {
-    color: var(--palette9);
+    color: var(--palette10);
 }
 
 /* Specific active state for Poweroff button */

@@ -1,0 +1,47 @@
+name: Reusable Release Workflow
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag'
+        required: true
+        type: string
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Validate Artifacts
+        run: |
+          if [ -z "$(ls -A artifacts/)" ]; then
+            echo "❌ No artifacts found!"
+            exit 1
+          fi
+          ls -lah artifacts/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ inputs.tag }}
+          title: "Release ${{ inputs.tag }}"
+          notes-file: CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Artifacts to Release
+        run: |
+          find artifacts/ -type f -exec gh release upload "${{ inputs.tag }}" {} \;
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

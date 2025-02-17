@@ -1,4 +1,4 @@
-# Finë Theme Configuration for GTK Action Buttons
+# Finë Theme Configuration for GTK Action Buttons - The default theme for Finë is [Rose Pine Moon](rose-pine-moon.toml)
 
 palette0 = "#232136"    # Base
 palette1 = "#2a273f"    # Surface

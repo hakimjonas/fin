@@ -1,7 +1,9 @@
-name: "Sync Version"
-description: "Syncs versioning in build pipelines"
+name: 'Sync Version'
+description: 'Synchronizes versioning in build pipelines (TypeScript)'
+inputs:
+  tag:
+    description: 'Optional tag to use (e.g., v1.2.3)'
+    required: false
 runs:
-  using: "composite"
-  steps:
-    - run: bash ${{ github.action_path }}/sync-version.sh
-      shell: bash
+  using: 'node20'
+  main: 'dist/index.js'

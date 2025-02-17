@@ -8,47 +8,14 @@ on:
 
 jobs:
   build_and_package:
-    name: Build Packages
     uses: ./.github/workflows/build.yml
     with:
       tag: ${{ github.ref_name }}
 
   release:
-    name: Publish Release
     needs: [ build_and_package ]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download All Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts/
-
-      - name: Validate Artifacts
-        run: |
-          if [ -z "$(ls -A artifacts/)" ]; then
-            echo "❌ No artifacts found!"
-            exit 1
-          fi
-          ls -lah artifacts/
-
-      - name: Create Release
-        run: |
-          gh release create "${{ github.ref_name }}" \
-            --title "Release ${{ github.ref_name }}" \
-            --notes-file CHANGELOG.md
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Artifacts to Release
-        run: |
-          find artifacts/ -type f -exec gh release upload "${{ github.ref_name }}" {} \;
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    uses: ./.github/workflows/reusable_release.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
