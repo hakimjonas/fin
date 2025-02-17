@@ -8,7 +8,7 @@ on:
         required: true
         type: string
     secrets:
-      GITHUB_TOKEN:
+      RELEASE_GITHUB_TOKEN:
         required: true
 
 jobs:
@@ -38,10 +38,10 @@ jobs:
           title: "Release ${{ inputs.tag }}"
           notes-file: CHANGELOG.md
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
 
       - name: Upload Artifacts to Release
         run: |
           find artifacts/ -type f -exec gh release upload "${{ inputs.tag }}" {} \;
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
