@@ -1,5 +1,4 @@
 name: Reusable Release Workflow
-
 on:
   workflow_call:
     inputs:
