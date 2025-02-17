@@ -1,3 +1,4 @@
+# File: .github/workflows/build.yml
 name: Build and Package
 
 on:
@@ -13,13 +14,11 @@ on:
         type: string
 
 env:
-  NODE_VERSION: '22'
+  NODE_VERSION: '20' # Update to the latest stable version
 
 jobs:
   sync-version:
     runs-on: ubuntu-latest
-    env:
-      GDK_BACKEND: wayland
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,12 +29,21 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
 
       - name: Install cargo-edit
         run: cargo install cargo-edit
 
+      - name: Check Version Format
+        id: version
+        uses: nowsprinting/check-version-format-action@v4.0.4
+        with:
+          prefix: 'v'
+
       - name: Sync Version
+        if: steps.semver.outputs.valid == 'true'
         uses: ./.github/actions/sync
         with:
           tag: ${{ github.ref_name }}
@@ -43,16 +51,14 @@ jobs:
   build:
     needs: sync-version
     runs-on: ubuntu-latest
-    container:
-      image: ${{ matrix.container }}
     strategy:
       fail-fast: false
       matrix:
+        distro: [ ubuntu, arch, solus, nix ]
         include:
           - distro: ubuntu
             package_task: deb
             container: ubuntu:latest
-            artifact_path: target/debian/*.deb
           - distro: arch
             package_task: arch
             container: archlinux:latest
@@ -74,43 +80,28 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Validate tag input
-        if: ${{ github.event.inputs.tag != '' }}
-        shell: bash
-        run: |
-          if [[ ! "${{ github.event.inputs.tag }}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?(\+[a-zA-Z0-9]+)?$ ]]; then
-            echo "❌ Invalid semantic version provided: ${{ github.event.inputs.tag }}"
-            exit 1
-          fi
-
-      - name: Verify Sync Action Directory
-        run: |
-          echo "Current Directory: $(pwd)"
-          echo "Listing .github/actions/sync:"
-          ls -la .github/actions/sync
-
-      - name: Install system dependencies
+      - name: Set up ${{ matrix.distro }} environment
         run: |
           case "${{ matrix.distro }}" in
             ubuntu)
-              apt-get update && apt-get install -y curl libgtk-4-dev build-essential pkg-config git dpkg-deb
-              curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-              apt-get install -y nodejs
+              apt-get update && apt-get install -y curl libgtk-4-dev build-essential pkg-config git
               ;;
             arch)
               pacman -Syu --noconfirm curl gtk4 base-devel pkgconf git
-              pacman -S --noconfirm nodejs npm
               ;;
             solus)
-              eopkg up -y && eopkg it -y curl libgtk-4-devel gcc git
-              eopkg it -y nodejs
+              eopkg up -y
+              eopkg it -y curl libgtk-4-devel gcc git
               ;;
             nix)
               apt-get update && apt-get install -y curl build-essential pkg-config libglib2.0-dev libgtk-4-dev git
-              curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-              apt-get install -y nodejs
               ;;
           esac
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -141,15 +132,12 @@ jobs:
       - name: Verify artifacts
         run: |
           echo "Artifact path: ${{ matrix.artifact_path }}"
+            echo "❌ No artifacts found for ${{ matrix.distro }}!"
+            exit 1
+          fi
+
       - name: Upload artifacts
-        if: ${{ !env.ACT }}
         uses: actions/upload-artifact@v4
         with:
           name: fin-${{ matrix.distro }}-${{ github.ref_name }}
           path: ${{ matrix.artifact_path }}
-
-      - name: Upload artifacts locally
-        if: ${{ env.ACT }}
-        run: |
-          echo "Uploading artifacts locally..."
-          # Add your local upload logic here
