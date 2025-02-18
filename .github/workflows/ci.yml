@@ -8,6 +8,21 @@ on:
   workflow_dispatch:
 
 jobs:
+
+  lint:
+    runs-on: ubuntu-latest
+    container:
+      image: hakimjonas/fin-deb-build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set Rust toolchain to stable
+        run: rustup default stable
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features --tests -- -D warnings
+      - name: Check Formatting
+        run: cargo fmt -- --check
+
   test:
     runs-on: ubuntu-latest
     container:
@@ -26,20 +41,6 @@ jobs:
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
       - name: Run Tests
         run: cargo test
-
-  lint:
-    runs-on: ubuntu-latest
-    container:
-      image: hakimjonas/fin-deb-build
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Set Rust toolchain to stable
-        run: rustup default stable
-      - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-      - name: Check Formatting
-        run: cargo fmt -- --check
 
   audit:
     runs-on: ubuntu-latest
