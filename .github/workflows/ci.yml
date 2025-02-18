@@ -2,13 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [ trunk ]
+    branches: [ '**' ]
   pull_request:
-    branches: [ trunk ]
+    branches: [ '**' ]
   workflow_dispatch:
 
-# Define a reusable checkout step.
-checkout: &checkout
+x-checkout: &checkout
   name: Checkout repository
   uses: actions/checkout@v4
 
@@ -18,7 +17,7 @@ jobs:
     container:
       image: hakimjonas/fin-deb-build
     steps:
-      - *checkout
+      - <<: *checkout
       - name: Cache Cargo registry
         uses: actions/cache@v4
         with:
@@ -34,7 +33,7 @@ jobs:
     container:
       image: hakimjonas/fin-deb-build
     steps:
-      - *checkout
+      - <<: *checkout
       - name: Run Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Check Formatting
@@ -45,6 +44,6 @@ jobs:
     container:
       image: hakimjonas/fin-deb-build
     steps:
-      - *checkout
+      - <<: *checkout
       - name: Run cargo-audit
         run: cargo audit
