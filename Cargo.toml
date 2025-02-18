@@ -1,6 +1,6 @@
 [package]
 name = "fin"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 description = "Finë is a simple, GTK4-based session controller for Linux desktops."
 license = "MIT"
@@ -11,19 +11,17 @@ repository = "https://github.com/hakimjonas/fin"
 documentation = "https://docs.rs/fin"
 
 [dependencies]
-gtk4 = { version = "0.9.5", features = ["v4_12"] }
-glib = "0.20.7"
+gtk4 = { version = "0.9.6", features = ["v4_16"] }
+glib = "0.20.9"
 anyhow = "1.0.95"
 im = { version = "15.1.0", features = ["serde"] }
 serde = { version = "1.0.217", features = ["derive"] }
 toml = "0.8.20"
-clap = { version = "4.5.28", features = ["derive"] }
+clap = { version = "4.5.29", features = ["derive"] }
 log = "0.4.25"
 env_logger = "0.11.6"
 dirs = "6.0.0"
-serde_yaml = "0.9.34"
-plist = "1.7.0"
-tempfile = "3.16.0"
+tempfile = "3.17.0"
 
 [profile.release]
 opt-level = "z"
@@ -31,3 +29,34 @@ lto = "thin"
 codegen-units = 1
 panic = "abort"
 strip = "symbols"
+
+[package.metadata.rpm]
+# The RPM package name (if different from your crate name)
+package = "fin"
+# Version
+version = "0.2.4"
+
+# RPM package release number
+release = "1"
+# A short summary of the package
+summary = "Finë: a simple GTK4-based session controller for Linux desktops"
+# URL for the project
+url = "https://github.com/hakimjonas/fin"
+# License in SPDX format
+license = "MIT"
+# List runtime dependencies (as RPM package names)
+requires = ["gtk4"]
+# Build-time dependencies
+makedepends = ["cargo", "rust", "git"]
+# Additional assets to include (each entry: [source, install_path, permissions])
+assets = [
+    ["target/release/fin", "/usr/bin/fin", "755"],
+    ["assets/config.toml", "/usr/share/fin/config.toml", "644"],
+    ["assets/style.css", "/usr/share/fin/style.css", "644"]
+]
+
+[package.metadata.rpm.cargo]
+buildflags = ["--release"]
+
+[package.metadata.rpm.targets]
+fin = { path = "/usr/bin/fin" }

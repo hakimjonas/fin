@@ -1,0 +1,59 @@
+# File: .github/workflows/reusable_release.yml
+name: Reusable Release Workflow
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag'
+        required: true
+        type: string
+    secrets:
+      RELEASE_GITHUB_TOKEN:
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Version Format
+        id: version
+        uses: nowsprinting/check-version-format-action@v4.0.4
+        with:
+          prefix: 'v'
+
+      - name: Checkout repository
+        if: steps.semver.outputs.valid == 'true'
+        uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        if: steps.semver.outputs.valid == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Validate Artifacts
+        if: steps.semver.outputs.valid == 'true'
+        run: |
+          if ! find artifacts/ -type f | read; then
+            echo "❌ No artifacts found!"
+            exit 1
+          fi
+          ls -lah artifacts/
+
+      - name: Create GitHub Release
+        if: steps.semver.outputs.valid == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          title: "Release ${{ inputs.tag }}"
+          notes_file: CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+
+      - name: Upload Artifacts to Release
+        if: steps.semver.outputs.valid == 'true'
+        run: |
+          find artifacts/ -type f -exec gh release upload "${{ inputs.tag }}" {} \;
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}

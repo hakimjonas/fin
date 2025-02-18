@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main       # Only run on push to main
+      - release/** # Add other important branches
+  pull_request:
+    branches: [ '**' ] # Run on all PRs
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    container:
+      image: hakimjonas/fin-deb-build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Cargo artifacts
+        uses: actions/cache@v3
+        with:
+          path: |
+            /root/.cargo/registry
+            /root/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Set Rust toolchain
+        run: rustup default stable
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features --tests -- -D warnings
+      - name: Check Formatting
+        run: cargo fmt -- --check
+
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: hakimjonas/fin-deb-build
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Cargo artifacts
+        uses: actions/cache@v3
+        with:
+          path: |
+            /root/.cargo/registry
+            /root/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Set Rust toolchain
+        run: rustup default stable
+      - name: Run Tests
+        run: cargo test --workspace --release
+
+  audit:
+    runs-on: ubuntu-latest
+    container:
+      image: hakimjonas/fin-deb-build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Cargo artifacts
+        uses: actions/cache@v3
+        with:
+          path: |
+            /root/.cargo/registry
+            /root/.cargo/git
+            /root/.cargo/bin
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Set Rust toolchain
+        run: rustup default stable
+      - name: Install cargo-audit
+        run: |
+          command -v cargo-audit || cargo install cargo-audit
+      - name: Run cargo-audit
+        run: cargo audit
+
+# Optional: Add concurrency to cancel previous runs for same ref
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true

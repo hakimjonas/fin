@@ -1,3 +1,90 @@
+File: workflows/reusable_release.yml
+Content:
+# File: .github/workflows/reusable_release.yml
+name: Reusable Release Workflow
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag'
+        required: true
+        type: string
+    secrets:
+      RELEASE_GITHUB_TOKEN:
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Version Format
+        id: version
+        uses: nowsprinting/check-version-format-action@v4.0.4
+        with:
+          prefix: 'v'
+
+      - name: Checkout repository
+        if: steps.semver.outputs.valid == 'true'
+        uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        if: steps.semver.outputs.valid == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Validate Artifacts
+        if: steps.semver.outputs.valid == 'true'
+        run: |
+          if ! find artifacts/ -type f | read; then
+            echo "❌ No artifacts found!"
+            exit 1
+          fi
+          ls -lah artifacts/
+
+      - name: Create GitHub Release
+        if: steps.semver.outputs.valid == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          title: "Release ${{ inputs.tag }}"
+          notes_file: CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+
+      - name: Upload Artifacts to Release
+        if: steps.semver.outputs.valid == 'true'
+        run: |
+          find artifacts/ -type f -exec gh release upload "${{ inputs.tag }}" {} \;
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+\n--------------------------------\n
+File: workflows/release.yml
+Content:
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build_and_package:
+    uses: ./.github/workflows/build.yml
+    with:
+      tag: ${{ github.ref_name }}
+
+  release:
+    needs: [ build_and_package ]
+    uses: ./.github/workflows/reusable_release.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets:
+      RELEASE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n--------------------------------\n
+File: workflows/build.yml
+Content:
 name: Build and Package
 
 on:
@@ -128,4 +215,28 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fin-${{ matrix.distro }}-${{ github.ref_name }}
-          path: ${{ matrix.artifact_path }}
+          path: ${{ matrix.artifact_path }}\n--------------------------------\n
+File: actions/sync/action.yml
+Content:
+name: 'Sync Version'
+description: 'Synchronizes versioning in build pipelines (TypeScript)'
+inputs:
+  tag:
+    description: 'Optional tag to use (e.g., v1.2.3)'
+    required: false
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+\n--------------------------------\n
+File: actions/sync/package-lock.json
+Metadata: Size: 54874, Last Modified: 2025-02-18 21:25:09.407536470 +0100
+\n--------------------------------\n
+File: actions/sync/tsconfig.json
+Metadata: Size: 246, Last Modified: 2025-02-18 21:25:09.407536470 +0100
+\n--------------------------------\n
+File: actions/sync/package.json
+Metadata: Size: 375, Last Modified: 2025-02-18 21:25:09.407536470 +0100
+\n--------------------------------\n
+File: actions/sync/src/index.ts
+Metadata: Size: 9753, Last Modified: 2025-02-18 21:25:09.407536470 +0100
+\n--------------------------------\n
