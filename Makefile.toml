@@ -10,10 +10,10 @@ VERSION = "${CARGO_MAKE_CRATE_VERSION}"
 description = "Install cargo-make if not already installed"
 script = [
     "if ! command -v cargo-make &> /dev/null; then",
-    "  echo 'cargo-make not found, installing...'",
+    "  echo \"cargo-make not found, installing...\"",
     "  cargo install cargo-make",
     "else",
-    "  echo 'cargo-make is already installed'",
+    "  echo \"cargo-make is already installed\"",
     "fi"
 ]
 
@@ -25,14 +25,14 @@ args = ["build", "--release"]
 [tasks.copy-assets]
 description = "Copy configuration, theme, and style assets to the installation directory"
 script = [
-    "echo 'Creating installation directory ${INSTALL_ASSETS_DIR}'",
+    "echo \"Creating installation directory ${INSTALL_ASSETS_DIR}\"",
     "sudo mkdir -p ${INSTALL_ASSETS_DIR}/themes",
     "sudo chmod 755 ${INSTALL_ASSETS_DIR}",
-    "echo 'Installing default configuration...'",
+    "echo \"Installing default configuration...\"",
     "sudo cp \"${ASSETS_DIR}/config.toml\" \"${INSTALL_ASSETS_DIR}/config.toml\"",
-    "echo 'Installing default stylesheet...'",
+    "echo \"Installing default stylesheet...\"",
     "sudo cp \"${ASSETS_DIR}/style.css\" \"${INSTALL_ASSETS_DIR}/style.css\"",
-    "echo 'Installing default theme...'",
+    "echo \"Installing default theme...\"",
     "sudo cp \"${ASSETS_DIR}/default.toml\" \"${INSTALL_ASSETS_DIR}/themes/default.toml\""
 ]
 
@@ -42,10 +42,10 @@ description = "Install the binary to the system binary directory"
 script = [
     "BINARY=${PROJECT_ROOT}/target/release/fin",
     "if [ ! -f \"${BINARY}\" ]; then",
-    "  echo 'Error: Binary not found at ${BINARY}' >&2",
+    "  echo \"Error: Binary not found at ${BINARY}\" >&2",
     "  exit 1",
     "fi",
-    "echo 'Installing binary to ${INSTALL_BIN_DIR}...'",
+    "echo \"Installing binary to ${INSTALL_BIN_DIR}...\"",
     "sudo cp ${BINARY} ${INSTALL_BIN_DIR}/",
     "sudo chmod 755 ${INSTALL_BIN_DIR}/fin"
 ]
@@ -86,12 +86,12 @@ script = [
     "      cargo make install-dependencies-solus",
     "      ;;",
     "    *)",
-    "      echo 'Unsupported distribution: $ID' >&2",
+    "      echo \"Unsupported distribution: $ID\" >&2",
     "      exit 1",
     "      ;;",
     "  esac",
     "else",
-    "  echo 'Cannot detect distribution' >&2",
+    "  echo \"Cannot detect distribution\" >&2",
     "  exit 1",
     "fi"
 ]
@@ -102,22 +102,22 @@ script = [
     "USER_CONFIG_DIR=${HOME}/.config/fin",
     "mkdir -p ${USER_CONFIG_DIR}/themes",
     "if [ ! -f ${USER_CONFIG_DIR}/config.toml ]; then",
-    "  echo 'Copying default configuration to ${USER_CONFIG_DIR}/config.toml'",
+    "  echo \"Copying default configuration to ${USER_CONFIG_DIR}/config.toml\"",
     "  cp ${ASSETS_DIR}/config.toml ${USER_CONFIG_DIR}/config.toml",
     "else",
-    "  echo 'User configuration already exists at ${USER_CONFIG_DIR}/config.toml'",
+    "  echo \"User configuration already exists at ${USER_CONFIG_DIR}/config.toml\"",
     "fi",
     "if [ ! -f ${USER_CONFIG_DIR}/style.css ]; then",
-    "  echo 'Copying default stylesheet to ${USER_CONFIG_DIR}/style.css'",
+    "  echo \"Copying default stylesheet to ${USER_CONFIG_DIR}/style.css\"",
     "  cp ${ASSETS_DIR}/style.css ${USER_CONFIG_DIR}/style.css",
     "else",
-    "  echo 'User stylesheet already exists at ${USER_CONFIG_DIR}/style.css'",
+    "  echo \"User stylesheet already exists at ${USER_CONFIG_DIR}/style.css\"",
     "fi",
     "if [ ! -f ${USER_CONFIG_DIR}/themes/default.toml ]; then",
-    "  echo 'Copying default theme to ${USER_CONFIG_DIR}/themes/default.toml'",
+    "  echo \"Copying default theme to ${USER_CONFIG_DIR}/themes/default.toml\"",
     "  cp ${ASSETS_DIR}/default.toml ${USER_CONFIG_DIR}/themes/default.toml",
     "else",
-    "  echo 'User theme already exists at ${USER_CONFIG_DIR}/themes/default.toml'",
+    "  echo \"User theme already exists at ${USER_CONFIG_DIR}/themes/default.toml\"",
     "fi"
 ]
 
@@ -129,49 +129,49 @@ dependencies = ["install-dependencies", "build-release", "copy-assets", "install
 [tasks.package-deb]
 description = "Package Finë as a .deb using cargo-deb"
 script = [
-    "echo 'Installing cargo-deb (if needed)...'",
+    "echo \"Installing cargo-deb (if needed)...\"",
     "cargo install cargo-deb --version 1.42.0 || true",
-    "echo 'Packaging .deb...'",
+    "echo \"Packaging .deb...\"",
     "cargo deb --no-build"
 ]
 
 [tasks.package-solus]
 description = "Package Finë for Solus as a tarball (including Solus manifest if available)"
 script = [
-    "echo 'Packaging for Solus...'",
+    "echo \"Packaging for Solus...\"",
     "rm -rf target/package/solus",
     "mkdir -p target/package/solus/usr/local/bin target/package/solus/usr/share/fin",
     "cp target/release/fin target/package/solus/usr/local/bin/",
     "cp -r assets target/package/solus/usr/share/fin/",
-    "if [ -f fin.sol ]; then cp fin.sol target/package/solus/; else echo 'Warning: No Solus manifest (fin.sol) found.'; fi",
+    "if [ -f fin.sol ]; then cp fin.sol target/package/solus/; else echo \"Warning: No Solus manifest (fin.sol) found.\"; fi",
     "tar -czvf target/fin-${VERSION}-solus.tar.gz -C target/package/solus .",
-    "echo 'Solus package created: target/fin-${VERSION}-solus.tar.gz'"
+    "echo \"Solus package created: target/fin-${VERSION}-solus.tar.gz\""
 ]
 
 [tasks.package-arch]
 description = "Package Finë for Arch Linux as a tarball (including PKGBUILD if available)"
 script = [
-    "echo 'Packaging for Arch...'",
+    "echo \"Packaging for Arch...\"",
     "rm -rf target/package/arch",
     "mkdir -p target/package/arch/fin",
     "cp target/release/fin target/package/arch/fin/",
     "cp -r assets target/package/arch/fin/",
-    "if [ -f PKGBUILD ]; then cp PKGBUILD target/package/arch/fin/; else echo 'Warning: No PKGBUILD file found.'; fi",
+    "if [ -f PKGBUILD ]; then cp PKGBUILD target/package/arch/fin/; else echo \"Warning: No PKGBUILD file found.\"; fi",
     "tar -czvf target/fin-${VERSION}-arch.tar.gz -C target/package/arch fin",
-    "echo 'Arch package created: target/fin-${VERSION}-arch.tar.gz'"
+    "echo \"Arch package created: target/fin-${VERSION}-arch.tar.gz\""
 ]
 
 [tasks.package-nix]
 description = "Package Finë for Nix as a tarball (including flake.nix if available)"
 script = [
-    "echo 'Packaging for Nix...'",
+    "echo \"Packaging for Nix...\"",
     "rm -rf target/package/nix",
     "mkdir -p target/package/nix/fin",
     "cp target/release/fin target/package/nix/fin/",
     "cp -r assets target/package/nix/fin/",
-    "if [ -f flake.nix ]; then cp flake.nix target/package/nix/fin/; else echo 'Warning: No flake.nix file found.'; fi",
+    "if [ -f flake.nix ]; then cp flake.nix target/package/nix/fin/; else echo \"Warning: No flake.nix file found.\"; fi",
     "tar -czvf target/fin-${VERSION}-nix.tar.gz -C target/package/nix fin",
-    "echo 'Nix package created: target/fin-${VERSION}-nix.tar.gz'"
+    "echo \"Nix package created: target/fin-${VERSION}-nix.tar.gz\""
 ]
 
 [tasks.package]

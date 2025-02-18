@@ -1,0 +1,9 @@
+name: 'Sync Version'
+description: 'Synchronizes versioning in build pipelines (TypeScript)'
+inputs:
+  tag:
+    description: 'Optional tag to use (e.g., v1.2.3)'
+    required: false
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

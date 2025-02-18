@@ -19,3 +19,7 @@
 *.lib
 *.idb
 .DS_Store
+
+# Node modules
+.github/actions/sync/dist
+.github/actions/sync/node_modules

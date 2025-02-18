@@ -1,0 +1,21 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build_and_package:
+    uses: ./.github/workflows/build.yml
+    with:
+      tag: ${{ github.ref_name }}
+
+  release:
+    needs: [ build_and_package ]
+    uses: ./.github/workflows/reusable_release.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets:
+      RELEASE_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
