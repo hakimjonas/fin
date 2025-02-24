@@ -60,6 +60,9 @@ jobs:
             curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
             sudo apt-get install -y nodejs
       - run:
+          name: Install GLib Development Libraries
+          command: sudo apt-get install -y libglib2.0-dev
+      - run:
           name: Set Rust toolchain
           command: rustup default stable
       - run:
