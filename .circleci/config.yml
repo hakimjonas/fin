@@ -3,7 +3,7 @@ version: 2.1
 executors:
   rust-executor:
     docker:
-      - image: cimg/rust:1.71.0
+      - image: hakimjonas/fin-deb-build
     working_directory: ~/repo
 
 jobs:
