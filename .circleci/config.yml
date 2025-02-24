@@ -11,6 +11,9 @@ jobs:
     executor: fin-deb-build
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - cargo-{{ checksum "Cargo.lock" }}
       - run:
           name: Set Rust toolchain
           command: rustup default stable
@@ -20,37 +23,59 @@ jobs:
       - run:
           name: Check Formatting
           command: cargo fmt -- --check
+      - save_cache:
+          paths:
+            - target
+            - ~/.cargo/registry
+            - ~/.cargo/git
+          key: cargo-{{ checksum "Cargo.lock" }}
 
   test:
     executor: fin-deb-build
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - cargo-{{ checksum "Cargo.lock" }}
       - run:
           name: Set Rust toolchain
           command: rustup default stable
       - run:
           name: Run Tests
           command: cargo test --workspace --release
+      - save_cache:
+          paths:
+            - target
+            - ~/.cargo/registry
+            - ~/.cargo/git
+          key: cargo-{{ checksum "Cargo.lock" }}
 
-  build_and_package:
+  build:
     executor: fin-deb-build
+    parallelism: 2
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - cargo-{{ checksum "Cargo.lock" }}
       - run:
           name: Set Rust toolchain
           command: rustup default stable
       - run:
           name: Build Release Binary
-          command: cargo make build-release
-      - run:
-          name: Package Artifacts
-          command: cargo make package
+          command: cargo build --release
+      - save_cache:
+          paths:
+            - target
+            - ~/.cargo/registry
+            - ~/.cargo/git
+          key: cargo-{{ checksum "Cargo.lock" }}
       - persist_to_workspace:
           root: .
           paths:
             - target
 
-  release:
+  package:
     executor: fin-deb-build
     steps:
       - checkout
@@ -60,16 +85,61 @@ jobs:
           name: Set Rust toolchain
           command: rustup default stable
       - run:
+          name: Package Artifacts
+          command: |
+            # Replace this with your packaging logic.
+            # For example, you might run cargo deb or tar up your release binary.
+            mkdir -p packaged
+            cp target/release/fin packaged/fin
+            tar -czvf packaged/fin.tar.gz -C packaged fin
+      - persist_to_workspace:
+          root: .
+          paths:
+            - packaged
+
+  release:
+    executor: fin-deb-build
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - restore_cache:
+          keys:
+            - cargo-{{ checksum "Cargo.lock" }}
+      - run:
+          name: Set Rust toolchain
+          command: rustup default stable
+      - run:
           name: Sync Version & Update Files
-          command: cargo make sync-version
-      - run:
-          name: Create GitHub Release
           command: |
-            gh release create ${CIRCLE_TAG} --notes-file CHANGELOG.md --title "Release ${CIRCLE_TAG}"
-      - run:
-          name: Upload Artifacts
-          command: |
-            find target -type f -name "fin-*.*" -exec gh release upload ${CIRCLE_TAG} {} \;
+            # Extract current version from Cargo.toml (assumes format: version = "X.Y.Z")
+            current_version=$(grep '^version' Cargo.toml | head -n1 | sed 's/version = "//;s/".*//')
+            IFS='.' read -r major minor patch <<< "$current_version"
+            new_patch=$((patch + 1))
+            new_version="${major}.${minor}.${new_patch}"
+            echo "Bumping version from $current_version to $new_version"
+
+            # Update Cargo.toml
+            sed -i "s/version = \"$current_version\"/version = \"$new_version\"/" Cargo.toml
+
+            # Prepend a new entry to CHANGELOG.md with the new version and current date
+            echo "## [${new_version}] - $(date +%Y-%m-%d)" | cat - CHANGELOG.md > temp && mv temp CHANGELOG.md
+
+            # Update INSTALL.md: Replace version in package filenames (e.g., fin-0.2.3-arch.tar.gz and fin_0.2.3_amd64.deb)
+            sed -i "s/fin-$current_version/fin-$new_version/g" INSTALL.md
+            sed -i "s/fin_$current_version/fin_$new_version/g" INSTALL.md
+
+            # Update PKGBUILD: Update the pkgver variable
+            sed -i "s/pkgver=$current_version/pkgver=$new_version/g" PKGBUILD
+
+            # Update flake.nix: Update the version attribute (assumes a line like: version = "X.Y.Z")
+            sed -i "s/version = \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/version = \"$new_version\"/g" flake.nix
+
+            # Update fin.sol: Update the <Version> tag in the XML file
+            sed -i "s/<Version>$current_version<\/Version>/<Version>$new_version<\/Version>/g" fin.sol
+
+            echo "Version bump completed: $new_version"
+
 
 workflows:
   version: 2
@@ -79,12 +149,15 @@ workflows:
       - test:
           requires:
             - lint
-      - build_and_package:
+      - build:
           requires:
             - test
+      - package:
+          requires:
+            - build
       - release:
           requires:
-            - build_and_package
+            - package
           filters:
             tags:
               only: /^v.*/
