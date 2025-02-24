@@ -11,6 +11,11 @@ jobs:
     executor: rust-executor
     steps:
       - checkout
+      - run:
+          name: Install system dependencies
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y pkg-config libglib2.0-dev libgtk-4-dev
       - restore_cache:
           keys:
             - cargo-{{ checksum "Cargo.lock" }}
@@ -33,6 +38,11 @@ jobs:
     executor: rust-executor
     steps:
       - checkout
+      - run:
+          name: Install system dependencies
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y pkg-config libglib2.0-dev libgtk-4-dev
       - restore_cache:
           keys:
             - cargo-{{ checksum "Cargo.lock" }}
@@ -48,46 +58,48 @@ jobs:
             - ~/.cargo
           key: cargo-{{ checksum "Cargo.lock" }}
 
-build_and_package:
-  executor: rust-executor
-  environment:
-    NODE_VERSION: "20"
-  steps:
-    - checkout
-    - run:
-        name: Install Node.js (v20)
-        command: |
-          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-          sudo apt-get install -y nodejs
-    - run:
-        name: Install GLib Development Libraries
-        command: sudo apt-get install -y libglib2.0-dev
-    - run:
-        name: Set PKG_CONFIG_PATH
-        command: |
-          export PKG_CONFIG_PATH=$(pkg-config --variable pc_path pkg-config)
-          echo "PKG_CONFIG_PATH is set to $PKG_CONFIG_PATH"
-    - run:
-        name: Set Rust toolchain
-        command: rustup default stable
-    - run:
-        name: Install Cargo Make
-        command: cargo install cargo-make || true
-    - run:
-        name: Build Release Binary
-        command: cargo make build-release
-    - run:
-        name: Package Artifacts
-        command: cargo make package
-    - persist_to_workspace:
-        root: .
-        paths:
-          - target
+  build_and_package:
+    executor: rust-executor
+    environment:
+      NODE_VERSION: "20"
+    steps:
+      - checkout
+      - run:
+          name: Install system dependencies
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y pkg-config libglib2.0-dev libgtk-4-dev
+      - run:
+          name: Install Node.js (v20)
+          command: |
+            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+      - run:
+          name: Set Rust toolchain
+          command: rustup default stable
+      - run:
+          name: Install Cargo Make
+          command: cargo install cargo-make || true
+      - run:
+          name: Build Release Binary
+          command: cargo make build-release
+      - run:
+          name: Package Artifacts
+          command: cargo make package
+      - persist_to_workspace:
+          root: .
+          paths:
+            - target
 
   release:
     executor: rust-executor
     steps:
       - checkout
+      - run:
+          name: Install system dependencies
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y pkg-config libglib2.0-dev libgtk-4-dev
       - attach_workspace:
           at: .
       - run:
