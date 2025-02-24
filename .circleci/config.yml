@@ -1,23 +1,16 @@
 version: 2.1
 
 executors:
-  rust-executor:
+  fin-deb-build:
     docker:
       - image: hakimjonas/fin-deb-build
-    working_directory: ~/repo
+    working_directory: /workspace
 
 jobs:
   lint:
-    executor: rust-executor
+    executor: fin-deb-build
     steps:
       - checkout
-      - run:
-          name: Install system dependencies
-          command: |
-            apt-get update
-      - restore_cache:
-          keys:
-            - cargo-{{ checksum "Cargo.lock" }}
       - run:
           name: Set Rust toolchain
           command: rustup default stable
@@ -27,58 +20,25 @@ jobs:
       - run:
           name: Check Formatting
           command: cargo fmt -- --check
-      - save_cache:
-          paths:
-            - target
-            - ~/.cargo
-          key: cargo-{{ checksum "Cargo.lock" }}
 
   test:
-    executor: rust-executor
+    executor: fin-deb-build
     steps:
       - checkout
-      - run:
-          name: Install system dependencies
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y pkg-config libglib2.0-dev libgtk-4-dev
-      - restore_cache:
-          keys:
-            - cargo-{{ checksum "Cargo.lock" }}
       - run:
           name: Set Rust toolchain
           command: rustup default stable
       - run:
           name: Run Tests
           command: cargo test --workspace --release
-      - save_cache:
-          paths:
-            - target
-            - ~/.cargo
-          key: cargo-{{ checksum "Cargo.lock" }}
 
   build_and_package:
-    executor: rust-executor
-    environment:
-      NODE_VERSION: "20"
+    executor: fin-deb-build
     steps:
       - checkout
       - run:
-          name: Install system dependencies
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y pkg-config libglib2.0-dev libgtk-4-dev
-      - run:
-          name: Install Node.js (v20)
-          command: |
-            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-            sudo apt-get install -y nodejs
-      - run:
           name: Set Rust toolchain
           command: rustup default stable
-      - run:
-          name: Install Cargo Make
-          command: cargo install cargo-make || true
       - run:
           name: Build Release Binary
           command: cargo make build-release
@@ -91,14 +51,9 @@ jobs:
             - target
 
   release:
-    executor: rust-executor
+    executor: fin-deb-build
     steps:
       - checkout
-      - run:
-          name: Install system dependencies
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y pkg-config libglib2.0-dev libgtk-4-dev
       - attach_workspace:
           at: .
       - run:
@@ -110,7 +65,6 @@ jobs:
       - run:
           name: Create GitHub Release
           command: |
-            # Ensure GitHub CLI is installed in the image or install it here if necessary.
             gh release create ${CIRCLE_TAG} --notes-file CHANGELOG.md --title "Release ${CIRCLE_TAG}"
       - run:
           name: Upload Artifacts
