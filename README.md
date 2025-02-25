@@ -1,5 +1,7 @@
 # Finë
 
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/hakimjonas/fin/tree/trunk.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/hakimjonas/fin/tree/trunk)
+
 Finë is a simple, GTK4-based session controller designed for Linux desktops. The aim is simple: to offer an unassuming
 yet effective means of managing session transitions like logging out, locking, rebooting, or shutting down—while
 embracing clarity and thoughtful design. It started as a personal project for my own use in HyprLand, but it should work

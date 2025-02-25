@@ -184,7 +184,7 @@ jobs:
           command: |
             current_version=$(grep 'version *= *"' Cargo.toml | head -n1 | sed 's/.*version *= *"//;s/".*//')
             echo "Current version: $current_version"
-            IFS='.' read -r major minor patch <<< "$current_version"
+            IFS='.' read -r major minor patch \<<< "$current_version"
             new_patch=$((patch + 1))
             new_version="${major}.${minor}.${new_patch}"
             new_version=$(echo "$new_version" | tr -d '[:space:]')
@@ -192,7 +192,8 @@ jobs:
             
             sed -i "s/version = \"$current_version\"/version = \"$new_version\"/" Cargo.toml
             echo "## [${new_version}] - $(date +%Y-%m-%d)" | cat - CHANGELOG.md > temp && mv temp CHANGELOG.md
-            sed -i -E "s/\bfin[-_]"$current_version"\b/fin-$new_version/g" INSTALL.md
+            sed -i "s/fin-$current_version/fin-$new_version/g" INSTALL.md
+            sed -i "s/fin_$current_version/fin_$new_version/g" INSTALL.md
             sed -E -i "s/pkgver=[0-9]+\.[0-9]+\.[0-9]+/pkgver=$new_version/g" PKGBUILD
             sed -E -i "s/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz/v$new_version.tar.gz/g" PKGBUILD
             sed -E -i "s/version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"$new_version\"/g" flake.nix
