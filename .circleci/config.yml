@@ -113,7 +113,7 @@ jobs:
           command: |
             # Extract current version from Cargo.toml (assumes format: version = "X.Y.Z")
             current_version=$(grep '^version' Cargo.toml | head -n1 | sed 's/version = "//;s/".*//')
-            IFS='.' read -r major minor patch <<< "$current_version"
+            IFS='.' read -r major minor patch \<<< "$current_version"
             new_patch=$((patch + 1))
             new_version="${major}.${minor}.${new_patch}"
             echo "Bumping version from $current_version to $new_version"
@@ -142,8 +142,8 @@ jobs:
       - run:
           name: Commit Version Bump
           command: |
-            git config --global user.email "ci@yourdomain.com"
-            git config --global user.name "CI Bot"
+            git config --global user.email "hakim@ghoula.net"
+            git config --global user.name "Hakim"
             git add Cargo.toml CHANGELOG.md INSTALL.md PKGBUILD flake.nix fin.sol
             git commit -m "Bump version to $new_version [ci skip]"
       - run:
