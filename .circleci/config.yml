@@ -31,7 +31,7 @@ jobs:
           keys:
             - cargo-{{ checksum "Cargo.lock" }}
       - run:
-          name: Set Rust toolchain
+          name: Set Rust Toolchain
           command: rustup default stable
       - run:
           name: Run Clippy
@@ -54,7 +54,7 @@ jobs:
           keys:
             - cargo-{{ checksum "Cargo.lock" }}
       - run:
-          name: Set Rust toolchain
+          name: Set Rust Toolchain
           command: rustup default stable
       - run:
           name: Run Tests
@@ -74,7 +74,7 @@ jobs:
           keys:
             - cargo-{{ checksum "Cargo.lock" }}
       - run:
-          name: Set Rust toolchain
+          name: Set Rust Toolchain
           command: rustup default stable
       - run:
           name: Build Release Binary
@@ -105,23 +105,24 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Package Artifacts
+          name: Build Packages for All Distributions
           command: |
             set -euo pipefail
-            mkdir -p packaged
-            [ -f target/release/fin ] || { echo "❌ Binary not found"; exit 1; }
-            cp -v target/release/fin packaged/
-            tar -czvf packaged/fin.tar.gz -C packaged fin
+            # Use cargo-make to run the 'package' task that invokes package-deb, package-solus, package-arch, and package-nix.
+            cargo make package
       - run:
           name: Verify Packaged Artifacts
           command: |
             set -euo pipefail
-            [ -f packaged/fin.tar.gz ] || { echo "❌ Missing package"; exit 1; }
-            sha256sum packaged/fin.tar.gz
+            ls -lh target/
+            [ -f target/debian/fin_*_amd64.deb ] || { echo "❌ Debian package missing"; exit 1; }
+            [ -f target/fin-*-arch.tar.gz ] || { echo "❌ Arch package missing"; exit 1; }
+            [ -f target/fin-*-solus.tar.gz ] || { echo "❌ Solus package missing"; exit 1; }
+            [ -f target/fin-*-nix.tar.gz ] || { echo "❌ Nix package missing"; exit 1; }
       - persist_to_workspace:
           root: .
           paths:
-            - packaged
+            - target/
 
   release:
     executor: fin-deb-build
@@ -138,47 +139,83 @@ jobs:
             printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import
             echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf  # Safer directive
       - run:
-          name: Update Version Metadata
+          name: Update Version Metadata and Commit Bump
           command: |
             set -euo pipefail
+            # Read the current version from Cargo.toml
             current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
-            [[ "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]] || { echo "❌ Invalid version format"; exit 1; }
-
+            if [[ ! "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
+              echo "❌ Invalid version format in Cargo.toml"
+              exit 1
+            fi
             major=${BASH_REMATCH[1]}
             minor=${BASH_REMATCH[2]}
             patch=${BASH_REMATCH[3]}
             new_patch=$((patch + 1))
             new_version="${major}.${minor}.${new_patch}${BASH_REMATCH[4]:-}"
-
-            sed -i "s/version = \".*\"/version = \"$new_version\"/" Cargo.toml
-            echo "✅ Version bumped to $new_version"
+            
+            # Update Cargo.toml
+            sed -i "s/^version *= *\".*\"/version = \"$new_version\"/" Cargo.toml
+            
+            # Update PKGBUILD (expects a line like: pkgver=0.2.5)
+            sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD
+            
+            # Update fin.sol (expects a line like: version: "0.2.5")
+            sed -i "s/^version: *\".*\"/version: \"$new_version\"/" fin.sol
+            
+            # Update flake.nix (expects a line like: version = "0.2.5";)
+            sed -i "s/^[[:space:]]*version *= *\".*\";/  version = \"$new_version\";/" flake.nix
+            
+            # Update INSTALL.md (expects a line starting with 'Version:')
+            sed -i "s/^Version: .*/Version: $new_version/" INSTALL.md
+            
+            echo "✅ Version bumped to $new_version in Cargo.toml, PKGBUILD, fin.sol, flake.nix, and INSTALL.md"
             echo "export RELEASE_VERSION=$new_version" >> $BASH_ENV
+
+            # Configure Git for automated commit
+            git config user.email "ci-bot@example.com"
+            git config user.name "CI Bot"
+
+            # Commit the version bump on a new branch
+            branch="version-bump-$new_version"
+            git checkout -b "$branch"
+            git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md
+            git commit -m "chore: bump version to $new_version"
+            git push origin "$branch"
       - run:
           name: Sign Artifacts and Generate Checksums
           command: |
             set -euo pipefail
-            for file in packaged/fin.tar.gz; do
-              gpg --batch --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" \
-                --detach-sign --armor "$file"
-              gpg --verify "${file}.asc" "$file"
-              sha256sum "$file" > "${file}.sha256"
+            for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
+              if [ -f "$file" ]; then
+                gpg --batch --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" --detach-sign --armor "$file"
+                sha256sum "$file" > "$file.sha256"
+              fi
             done
       - run:
           name: Publish Release
           command: |
             set -euo pipefail
-            # Handle GH_TOKEN auth
+            # Authenticate with GitHub
             GITHUB_TOKEN_VALUE="$GH_TOKEN"
             unset GH_TOKEN
             echo "$GITHUB_TOKEN_VALUE" | gh auth login --with-token
 
             current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
-
             gh release create "v${current_version}" \
               --title "Release ${current_version}" \
               --notes-file CHANGELOG.md \
-              packaged/fin.tar.gz packaged/fin.tar.gz.asc packaged/fin.tar.gz.sha256
-
+              target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz \
+              target/debian/fin_*_amd64.deb.asc target/fin-*-arch.tar.gz.asc target/fin-*-solus.tar.gz.asc target/fin-*-nix.tar.gz.asc \
+              target/debian/fin_*_amd64.deb.sha256 target/fin-*-arch.tar.gz.sha256 target/fin-*-solus.tar.gz.sha256 target/fin-*-nix.tar.gz.sha256
+      - run:
+          name: Create Version Bump PR
+          command: |
+            set -euo pipefail
+            current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
+            pr_title="chore: version bump to $current_version"
+            pr_body="Automated version bump to $current_version."
+            gh pr create --title "$pr_title" --body "$pr_body" --base main --head "version-bump-$current_version"
 
 workflows:
   version: 2
