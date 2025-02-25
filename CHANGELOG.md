@@ -1,3 +1,4 @@
+## [0.2.6] - 2025-02-25
 # Changelog
 
 All notable changes to this project will be documented in this file.
