@@ -161,8 +161,8 @@ jobs:
           name: Build Packages for All Distributions
           command: |
             set -euo pipefail
-            # Use cargo-make to run the 'package' task that invokes package-deb, package-solus, package-arch, and package-nix.
-            cargo make package
+            # Run cargo-make package task with --allow-dirty to permit packaging with uncommitted changes.
+            cargo make package -- --allow-dirty
       - run:
           name: Verify Packaged Artifacts
           command: |
@@ -176,6 +176,7 @@ jobs:
           root: .
           paths:
             - target/
+
 
   release:
     executor: fin-deb-build
