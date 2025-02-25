@@ -16,24 +16,20 @@ ENV PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Install cargo-make
-RUN cargo install cargo-make
-
-# Install Node.js
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs
+# Install cargo-make and cargo-audit
+RUN cargo install cargo-make cargo-audit
 
 # Set the working directory
 WORKDIR /workspace
 
 # Copy the project files
-COPY .. .
+COPY . .
+
+# Update Rust toolchain and dependencies
+RUN rustup update && cargo update
 
 # Install Rust dependencies
 RUN cargo fetch
-
-# Install Node.js dependencies
-RUN npm install --prefix .github/actions/sync
 
 # Build the project
 RUN cargo build

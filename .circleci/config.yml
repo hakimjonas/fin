@@ -83,9 +83,6 @@ jobs:
           name: Set Rust toolchain
           command: rustup default stable
       - run:
-          name: Install Cargo Audit
-          command: cargo install cargo-audit
-      - run:
           name: Run Cargo Audit
           command: cargo audit
 
@@ -113,7 +110,7 @@ jobs:
               echo "Packaged file missing!"
               exit 1
             fi
-            # Compute a checksum and output it (could compare to a known value if desired)
+            # Compute a checksum and output it
             sha256sum packaged/fin.tar.gz
       - persist_to_workspace:
           root: .
@@ -133,6 +130,12 @@ jobs:
           name: Set Rust toolchain
           command: rustup default stable
       - run:
+          name: Import GPG Key
+          command: |
+            echo "$FINE_SIGNATURE_KEY" | gpg --import
+            echo "use-agent" >> ~/.gnupg/gpg.conf
+            echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+      - run:
           name: Sync Version & Update Files
           command: |
             # Extract current version from Cargo.toml (assumes format: version = "X.Y.Z")
@@ -148,7 +151,7 @@ jobs:
             # Prepend a new entry to CHANGELOG.md with the new version and current date
             echo "## [${new_version}] - $(date +%Y-%m-%d)" | cat - CHANGELOG.md > temp && mv temp CHANGELOG.md
             
-            # Update INSTALL.md: Replace version in package filenames (e.g., fin-0.2.3-arch.tar.gz and fin_0.2.3_amd64.deb)
+            # Update INSTALL.md: Replace version in package filenames
             sed -i "s/fin-$current_version/fin-$new_version/g" INSTALL.md
             sed -i "s/fin_$current_version/fin_$new_version/g" INSTALL.md
             
@@ -156,7 +159,7 @@ jobs:
             sed -i "s/pkgver=$current_version/pkgver=$new_version/g" PKGBUILD
             sed -i "s/v$current_version\.tar.gz/v$new_version.tar.gz/g" PKGBUILD
             
-            # Update flake.nix: Update the version attribute (assumes a line like: version = "X.Y.Z")
+            # Update flake.nix: Update the version attribute
             sed -i "s/version = \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/version = \"$new_version\"/g" flake.nix
             
             # Update fin.sol: Update the <Version> tag in the XML file
@@ -182,13 +185,20 @@ jobs:
             # Automatically merge the PR into "trunk"
             gh pr merge version-bump-$new_version --auto --squash --delete-branch
       - run:
+          name: Sign Artifacts and Generate Checksums
+          command: |
+            for file in packaged/fin.tar.gz; do
+              gpg --batch --yes --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" --detach-sign --armor "$file"
+              sha256sum "$file" > "$file.sha256"
+            done
+      - run:
           name: Create GitHub Release
           command: |
             gh release create ${CIRCLE_TAG} --notes-file CHANGELOG.md --title "Release ${CIRCLE_TAG}"
       - run:
           name: Upload Artifacts
           command: |
-            for file in packaged/fin.tar.gz packaged/fin-*.tar.gz packaged/fin-*.deb; do
+            for file in packaged/fin.tar.gz packaged/fin.tar.gz.asc packaged/fin.tar.gz.sha256; do
               gh release upload ${CIRCLE_TAG} "$file"
             done
 
