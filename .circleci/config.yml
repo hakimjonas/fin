@@ -155,18 +155,21 @@ jobs:
           name: Publish Release
           command: |
             set -euo pipefail
-            echo "$GH_TOKEN" | gh auth login --with-token
+            # Store token and unset GH_TOKEN to avoid CLI conflict
+            GITHUB_TOKEN_VALUE="$GH_TOKEN"
+            unset GH_TOKEN
+            echo "$GITHUB_TOKEN_VALUE" | gh auth login --with-token
 
-            # Extract the updated version from Cargo.toml
+            # Extract version from Cargo.toml
             current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
 
-            # Create release using the version from Cargo.toml
+            # Create release
             gh release create "v${current_version}" \
               --title "Release ${current_version}" \
               --notes-file CHANGELOG.md \
               packaged/fin.tar.gz{,.asc,.sha256}
 
-            # Sign and verify artifacts
+            # Sign artifacts
             for file in packaged/fin.tar.gz; do
               gpg --batch --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" \
                 --detach-sign --armor "$file"
