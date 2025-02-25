@@ -133,56 +133,49 @@ jobs:
           name: Configure GPG
           command: |
             set -euo pipefail
+            mkdir -p ~/.gnupg
+            chmod 700 ~/.gnupg
             printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import
-            echo "allow-loopback-pinentry" >> ~/.gnupg/gpg.conf
+            echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf  # Safer directive
       - run:
           name: Update Version Metadata
           command: |
             set -euo pipefail
             current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
             [[ "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]] || { echo "❌ Invalid version format"; exit 1; }
-            
+
             major=${BASH_REMATCH[1]}
             minor=${BASH_REMATCH[2]}
             patch=${BASH_REMATCH[3]}
             new_patch=$((patch + 1))
             new_version="${major}.${minor}.${new_patch}${BASH_REMATCH[4]:-}"
-            
+
             sed -i "s/version = \".*\"/version = \"$new_version\"/" Cargo.toml
             echo "✅ Version bumped to $new_version"
             echo "export RELEASE_VERSION=$new_version" >> $BASH_ENV
       - run:
-          name: Sign Artifacts
+          name: Publish Release
           command: |
             set -euo pipefail
+            # Handle GH_TOKEN auth
+            GITHUB_TOKEN_VALUE="$GH_TOKEN"
+            unset GH_TOKEN
+            echo "$GITHUB_TOKEN_VALUE" | gh auth login --with-token
+
+            current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
+
+            gh release create "v${current_version}" \
+              --title "Release ${current_version}" \
+              --notes-file CHANGELOG.md \
+              packaged/fin.tar.gz{,.asc,.sha256}
+
+            # Sign artifacts with explicit pinentry flag
             for file in packaged/fin.tar.gz; do
               gpg --batch --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" \
                 --detach-sign --armor "$file"
               gpg --verify "${file}.asc" "$file"
               sha256sum "$file" > "${file}.sha256"
             done
-      - run:
-          name: Verify Signed Artifacts
-          command: |
-            set -euo pipefail
-            [ -f packaged/fin.tar.gz.asc ] || { echo "❌ Missing signed package"; exit 1; }
-      - run:
-          name: Publish Release
-          command: |
-            set -euo pipefail
-            # Store token and unset GH_TOKEN to avoid CLI conflict
-            GITHUB_TOKEN_VALUE="$GH_TOKEN"
-            unset GH_TOKEN
-            echo "$GITHUB_TOKEN_VALUE" | gh auth login --with-token
-            
-            # Extract version from Cargo.toml
-            current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
-            
-            # Create release
-            gh release create "v${current_version}" \
-              --title "Release ${current_version}" \
-              --notes-file CHANGELOG.md \
-              packaged/fin.tar.gz{,.asc,.sha256}
 
 workflows:
   version: 2
