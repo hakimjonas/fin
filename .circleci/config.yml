@@ -26,7 +26,15 @@ jobs:
               echo "FINE_SIGNATURE_PASSPHRASE is not set!"
               exit 1
             fi
-            echo "All required environment variables are set."
+            if [ -z "$CIRCLE_TAG" ]; then
+              echo "CIRCLE_TAG is not set! This job must be triggered by a tag."
+              exit 1
+            fi
+            if [ -z "$CIRCLE_SHA1" ]; then
+              echo "CIRCLE_SHA1 is not set!"
+              exit 1
+            fi
+            echo "All required environment variables (GH_TOKEN, FINE_SIGNATURE_KEY_B64, FINE_SIGNATURE_PASSPHRASE, CIRCLE_TAG, CIRCLE_SHA1) are set."
       - run:
           name: Test GPG Key Import
           command: |
@@ -184,7 +192,7 @@ jobs:
           command: |
             current_version=$(grep 'version *= *"' Cargo.toml | head -n1 | sed 's/.*version *= *"//;s/".*//')
             echo "Current version: $current_version"
-            IFS='.' read -r major minor patch  \<<< "$current_version"
+            IFS='.' read -r major minor patch <<< "$current_version"
             new_patch=$((patch + 1))
             new_version="${major}.${minor}.${new_patch}"
             echo "Bumping version from $current_version to $new_version"
@@ -247,18 +255,18 @@ workflows:
   build_test_release:
     jobs:
       - env_check
+      - audit
       - lint:
-          requires: [ env_check ]
+          requires: [ audit, env_check ]
       - test:
-          requires: [ env_check ]
+          requires: [ audit, env_check ]
       - build:
-          requires: [ env_check, test ]
-      - audit:
-          requires: [ env_check, lint, test, build ]
+          requires: [ audit, env_check ]
+
       - package:
-          requires: [ env_check, audit ]
+          requires: [ build, lint, test ]
       - release:
-          requires: [ env_check, package ]
+          requires: [ package ]
           filters:
             tags:
               only: /^v.*/
