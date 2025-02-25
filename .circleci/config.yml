@@ -75,6 +75,17 @@ jobs:
           paths:
             - target
 
+  audit:
+    executor: fin-deb-build
+    steps:
+      - checkout
+      - run:
+          name: Set Rust toolchain
+          command: rustup default stable
+      - run:
+          name: Run Cargo Audit
+          command: cargo audit
+
   package:
     executor: fin-deb-build
     steps:
@@ -91,6 +102,16 @@ jobs:
             mkdir -p packaged
             cp target/release/fin packaged/fin
             tar -czvf packaged/fin.tar.gz -C packaged fin
+      - run:
+          name: Verify Packaged Artifacts
+          command: |
+            # Verify that the expected packaged file exists
+            if [ ! -f packaged/fin.tar.gz ]; then
+              echo "Packaged file missing!"
+              exit 1
+            fi
+            # Compute a checksum and output it (could compare to a known value if desired)
+            sha256sum packaged/fin.tar.gz
       - persist_to_workspace:
           root: .
           paths:
@@ -147,15 +168,15 @@ jobs:
             git add Cargo.toml CHANGELOG.md INSTALL.md PKGBUILD flake.nix fin.sol
             git commit -m "Bump version to $new_version [ci skip]"
       - run:
-          name: Push Version Bump Branch
+          name: Push Version Bump Branch and Create PR
           command: |
+            # Create a new branch for the version bump from the default branch "trunk"
             git checkout -b version-bump-$new_version
             git push origin version-bump-$new_version
-      - run:
-          name: Create and Merge Automatic PR
-          command: |
-            pr_url=$(gh pr create --title "Version bump to $new_version" --body "Automated version bump" --base ${CIRCLE_BRANCH} --head version-bump-$new_version)
+            # Create a pull request with base "trunk"
+            pr_url=$(gh pr create --title "Version bump to $new_version" --body "Automated version bump" --base trunk --head version-bump-$new_version)
             echo "Created PR: $pr_url"
+            # Automatically merge the PR into "trunk"
             gh pr merge version-bump-$new_version --auto --squash --delete-branch
       - run:
           name: Create GitHub Release
@@ -164,7 +185,10 @@ jobs:
       - run:
           name: Upload Artifacts
           command: |
-            for file in packaged/fin.tar.gz packaged/fin-*.tar.gz packaged/fin-*.deb; do gh release upload ${CIRCLE_TAG} "$file"; done
+            for file in packaged/fin.tar.gz packaged/fin-*.tar.gz packaged/fin-*.deb; do
+              gh release upload ${CIRCLE_TAG} "$file"
+            done
+
 workflows:
   version: 2
   build_test_release:
@@ -176,9 +200,13 @@ workflows:
       - build:
           requires:
             - test
+      - audit:
+          requires:
+            - build
       - package:
           requires:
             - build
+            - audit
       - release:
           requires:
             - package
