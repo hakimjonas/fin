@@ -105,12 +105,10 @@ jobs:
       - run:
           name: Verify Packaged Artifacts
           command: |
-            # Verify that the expected packaged file exists
             if [ ! -f packaged/fin.tar.gz ]; then
               echo "Packaged file missing!"
               exit 1
             fi
-            # Compute a checksum and output it
             sha256sum packaged/fin.tar.gz
       - persist_to_workspace:
           root: .
@@ -130,43 +128,53 @@ jobs:
           name: Set Rust toolchain
           command: rustup default stable
       - run:
+          name: Install GitHub CLI
+          command: |
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update && sudo apt install gh -y
+      - run:
           name: Import GPG Key
           command: |
-            printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --no-tty --import --batch --yes
+            printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --no-tty --batch --yes --import
             echo "use-agent" >> ~/.gnupg/gpg.conf
             echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
-
       - run:
           name: Sync Version & Update Files
           command: |
-            # Extract current version from Cargo.toml (assumes format: version = "X.Y.Z")
-            current_version=$(grep '^version' Cargo.toml | head -n1 | sed 's/version = "//;s/".*//')
+            # Extract current version from Cargo.toml (allows for leading whitespace)
+            current_version=$(grep 'version *= *"' Cargo.toml | head -n1 | sed 's/.*version *= *"//;s/".*//')
+            echo "Current version: $current_version"
             IFS='.' read -r major minor patch \<<< "$current_version"
             new_patch=$((patch + 1))
             new_version="${major}.${minor}.${new_patch}"
             echo "Bumping version from $current_version to $new_version"
-            
-            # Update Cargo.toml
+
+            # Update top-level version in Cargo.toml (first occurrence)
             sed -i "s/version = \"$current_version\"/version = \"$new_version\"/" Cargo.toml
-            
+
             # Prepend a new entry to CHANGELOG.md with the new version and current date
             echo "## [${new_version}] - $(date +%Y-%m-%d)" | cat - CHANGELOG.md > temp && mv temp CHANGELOG.md
-            
+
             # Update INSTALL.md: Replace version in package filenames
             sed -i "s/fin-$current_version/fin-$new_version/g" INSTALL.md
             sed -i "s/fin_$current_version/fin_$new_version/g" INSTALL.md
-            
+
             # Update PKGBUILD: Update the pkgver variable and the version in the source URL
-            sed -i "s/pkgver=$current_version/pkgver=$new_version/g" PKGBUILD
-            sed -i "s/v$current_version\.tar.gz/v$new_version.tar.gz/g" PKGBUILD
-            
+            sed -E -i "s/pkgver=[0-9]+\.[0-9]+\.[0-9]+/pkgver=$new_version/g" PKGBUILD
+            sed -E -i "s/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz/v$new_version.tar.gz/g" PKGBUILD
+
             # Update flake.nix: Update the version attribute
-            sed -i "s/version = \"[0-9]\+\.[0-9]\+\.[0-9]\+\"/version = \"$new_version\"/g" flake.nix
-            
+            sed -E -i "s/version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"$new_version\"/g" flake.nix
+
             # Update fin.sol: Update the <Version> tag in the XML file
             sed -i "s/<Version>$current_version<\/Version>/<Version>$new_version<\/Version>/g" fin.sol
-            
+
+            # Additionally, update the [package.metadata.rpm] version in Cargo.toml:
+            sed -i "/\[package.metadata.rpm\]/,/^\[/ s/version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"$new_version\"/" Cargo.toml
+
             echo "Version bump completed: $new_version"
+
       - run:
           name: Commit Version Bump
           command: |
@@ -177,27 +185,22 @@ jobs:
       - run:
           name: Push Version Bump Branch and Create PR
           command: |
-            
             # Create a new branch for the version bump from the default branch "trunk"
             git checkout -b version-bump-$new_version
-            # If the branch already exists on the remote, delete it
+            # If the branch already exists on remote, delete it
             if git ls-remote --exit-code --heads origin version-bump-$new_version; then
-            echo "Remote branch version-bump-$new_version exists. Deleting it..."
-            git push origin --delete version-bump-$new_version
+              echo "Remote branch version-bump-$new_version exists. Deleting it..."
+              git push origin --delete version-bump-$new_version
             fi
-            # Push the new branch
             git push origin version-bump-$new_version
-            # Create a pull request with base "trunk"
             pr_url=$(gh pr create --title "Version bump to $new_version" --body "Automated version bump" --base trunk --head version-bump-$new_version)
             echo "Created PR: $pr_url"
-            # Automatically merge the PR into "trunk"
             gh pr merge version-bump-$new_version --auto --squash --delete-branch
-
       - run:
           name: Sign Artifacts and Generate Checksums
           command: |
             for file in packaged/fin.tar.gz; do
-            gpg --batch --no-tty --yes --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" --detach-sign --armor "$file"
+              gpg --batch --no-tty --yes --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" --detach-sign --armor "$file"
               sha256sum "$file" > "$file.sha256"
             done
       - run:
