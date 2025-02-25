@@ -22,6 +22,59 @@ jobs:
               fi
             done
             echo "✅ All required environment variables are set."
+      - run:
+          name: Test Version Bump Sed Patterns
+          command: |
+            set -euo pipefail
+            # Define a test new version for substitution
+            test_new_version="0.2.6"
+            
+            # Test for Cargo.toml
+            sample_cargo='version = "0.2.5"'
+            expected_cargo='version = "0.2.6"'
+            result_cargo=$(echo "$sample_cargo" | sed "s/^version *= *\"[^\"]*\"/version = \"$test_new_version\"/")
+            if [ "$result_cargo" != "$expected_cargo" ]; then
+              echo "Cargo.toml sed pattern failed: got '$result_cargo', expected '$expected_cargo'"
+              exit 1
+            fi
+
+            # Test for PKGBUILD
+            sample_pkgbuild='pkgver=0.2.5'
+            expected_pkgbuild='pkgver=0.2.6'
+            result_pkgbuild=$(echo "$sample_pkgbuild" | sed "s/^pkgver=.*/pkgver=$test_new_version/")
+            if [ "$result_pkgbuild" != "$expected_pkgbuild" ]; then
+              echo "PKGBUILD sed pattern failed: got '$result_pkgbuild', expected '$expected_pkgbuild'"
+              exit 1
+            fi
+
+            # Test for fin.sol
+            sample_finsol='version: "0.2.5"'
+            expected_finsol='version: "0.2.6"'
+            result_finsol=$(echo "$sample_finsol" | sed "s/^version: *\"[^\"]*\"/version: \"$test_new_version\"/")
+            if [ "$result_finsol" != "$expected_finsol" ]; then
+              echo "fin.sol sed pattern failed: got '$result_finsol', expected '$expected_finsol'"
+              exit 1
+            fi
+
+            # Test for flake.nix
+            sample_flake='  version = "0.2.5";'
+            expected_flake='  version = "0.2.6";'
+            result_flake=$(echo "$sample_flake" | sed "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$test_new_version\";/")
+            if [ "$result_flake" != "$expected_flake" ]; then
+              echo "flake.nix sed pattern failed: got '$result_flake', expected '$expected_flake'"
+              exit 1
+            fi
+
+            # Test for INSTALL.md
+            sample_install='Version: 0.2.5'
+            expected_install='Version: 0.2.6'
+            result_install=$(echo "$sample_install" | sed "s/^Version: .*/Version: $test_new_version/")
+            if [ "$result_install" != "$expected_install" ]; then
+              echo "INSTALL.md sed pattern failed: got '$result_install', expected '$expected_install'"
+              exit 1
+            fi
+            
+            echo "✅ All version bump sed patterns passed."
 
   lint:
     executor: fin-deb-build
@@ -164,7 +217,7 @@ jobs:
             sed -i "s/^version: *\".*\"/version: \"$new_version\"/" fin.sol
             
             # Update flake.nix (expects a line like: version = "0.2.5";)
-            sed -i "s/^[[:space:]]*version *= *\".*\";/  version = \"$new_version\";/" flake.nix
+            sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
             
             # Update INSTALL.md (expects a line starting with 'Version:')
             sed -i "s/^Version: .*/Version: $new_version/" INSTALL.md
