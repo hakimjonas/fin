@@ -7,6 +7,37 @@ executors:
     working_directory: /workspace
 
 jobs:
+  env_check:
+    executor: fin-deb-build
+    steps:
+      - checkout
+      - run:
+          name: Verify Required Environment Variables
+          command: |
+            if [ -z "$GH_TOKEN" ]; then
+              echo "GH_TOKEN is not set!"
+              exit 1
+            fi
+            if [ -z "$FINE_SIGNATURE_KEY_B64" ]; then
+              echo "FINE_SIGNATURE_KEY_B64 is not set!"
+              exit 1
+            fi
+            if [ -z "$FINE_SIGNATURE_PASSPHRASE" ]; then
+              echo "FINE_SIGNATURE_PASSPHRASE is not set!"
+              exit 1
+            fi
+            echo "All required environment variables are set."
+      - run:
+          name: Test GPG Key Import
+          command: |
+            printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --no-tty --batch --yes --import
+            echo "GPG key imported successfully."
+      - run:
+          name: Verify GH_TOKEN with GitHub CLI
+          command: |
+            gh auth status || { echo "GH_TOKEN is not working correctly!"; exit 1; }
+            echo "GH_TOKEN is working correctly."
+
   lint:
     executor: fin-deb-build
     steps:
@@ -98,7 +129,6 @@ jobs:
       - run:
           name: Package Artifacts
           command: |
-            # Example packaging logic: copy the release binary and create a tarball.
             mkdir -p packaged
             cp target/release/fin packaged/fin
             tar -czvf packaged/fin.tar.gz -C packaged fin
@@ -130,9 +160,9 @@ jobs:
       - run:
           name: Install GitHub CLI
           command: |
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |  dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" |  tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-             apt update &&  apt install gh -y
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            apt update && apt install gh -y
       - run:
           name: Import GPG Key
           command: |
@@ -142,39 +172,23 @@ jobs:
       - run:
           name: Sync Version & Update Files
           command: |
-            # Extract current version from Cargo.toml (allows for leading whitespace)
             current_version=$(grep 'version *= *"' Cargo.toml | head -n1 | sed 's/.*version *= *"//;s/".*//')
             echo "Current version: $current_version"
-            IFS='.' read -r major minor patch \<<< "$current_version"
+            IFS='.' read -r major minor patch  \<<< "$current_version"
             new_patch=$((patch + 1))
             new_version="${major}.${minor}.${new_patch}"
             echo "Bumping version from $current_version to $new_version"
-
-            # Update top-level version in Cargo.toml (first occurrence)
+            
             sed -i "s/version = \"$current_version\"/version = \"$new_version\"/" Cargo.toml
-
-            # Prepend a new entry to CHANGELOG.md with the new version and current date
             echo "## [${new_version}] - $(date +%Y-%m-%d)" | cat - CHANGELOG.md > temp && mv temp CHANGELOG.md
-
-            # Update INSTALL.md: Replace version in package filenames
             sed -i "s/fin-$current_version/fin-$new_version/g" INSTALL.md
             sed -i "s/fin_$current_version/fin_$new_version/g" INSTALL.md
-
-            # Update PKGBUILD: Update the pkgver variable and the version in the source URL
             sed -E -i "s/pkgver=[0-9]+\.[0-9]+\.[0-9]+/pkgver=$new_version/g" PKGBUILD
             sed -E -i "s/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz/v$new_version.tar.gz/g" PKGBUILD
-
-            # Update flake.nix: Update the version attribute
             sed -E -i "s/version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"$new_version\"/g" flake.nix
-
-            # Update fin.sol: Update the <Version> tag in the XML file
             sed -i "s/<Version>$current_version<\/Version>/<Version>$new_version<\/Version>/g" fin.sol
-
-            # Additionally, update the [package.metadata.rpm] version in Cargo.toml:
             sed -i "/\[package.metadata.rpm\]/,/^\[/ s/version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"$new_version\"/" Cargo.toml
-
             echo "Version bump completed: $new_version"
-
       - run:
           name: Commit Version Bump
           command: |
@@ -185,9 +199,7 @@ jobs:
       - run:
           name: Push Version Bump Branch and Create PR
           command: |
-            # Create a new branch for the version bump from the default branch "trunk"
             git checkout -b version-bump-$new_version
-            # If the branch already exists on remote, delete it
             if git ls-remote --exit-code --heads origin version-bump-$new_version; then
               echo "Remote branch version-bump-$new_version exists. Deleting it..."
               git push origin --delete version-bump-$new_version
@@ -218,20 +230,19 @@ workflows:
   version: 2
   build_test_release:
     jobs:
-      - lint
-      - test
-      - build
+      - env_check
+      - lint:
+          requires: [ env_check ]
+      - test:
+          requires: [ env_check, lint ]
+      - build:
+          requires: [ env_check, test ]
       - audit:
-          requires:
-            - lint
-            - test
-            - build
+          requires: [ env_check, lint, test, build ]
       - package:
-          requires:
-            - audit
+          requires: [ env_check, audit ]
       - release:
-          requires:
-            - package
+          requires: [ env_check, package ]
           filters:
             tags:
               only: /^v.*/
