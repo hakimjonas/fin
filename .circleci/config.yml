@@ -83,6 +83,9 @@ jobs:
           name: Set Rust toolchain
           command: rustup default stable
       - run:
+          name: Install Cargo Audit
+          command: cargo install cargo-audit
+      - run:
           name: Run Cargo Audit
           command: cargo audit
 
@@ -194,18 +197,15 @@ workflows:
   build_test_release:
     jobs:
       - lint
-      - test:
-          requires:
-            - lint
-      - build:
-          requires:
-            - test
+      - test
+      - build
       - audit:
           requires:
+            - lint
+            - test
             - build
       - package:
           requires:
-            - build
             - audit
       - release:
           requires:
