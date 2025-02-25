@@ -177,14 +177,22 @@ jobs:
       - run:
           name: Push Version Bump Branch and Create PR
           command: |
+            
             # Create a new branch for the version bump from the default branch "trunk"
             git checkout -b version-bump-$new_version
+            # If the branch already exists on the remote, delete it
+            if git ls-remote --exit-code --heads origin version-bump-$new_version; then
+            echo "Remote branch version-bump-$new_version exists. Deleting it..."
+            git push origin --delete version-bump-$new_version
+            fi
+            # Push the new branch
             git push origin version-bump-$new_version
             # Create a pull request with base "trunk"
             pr_url=$(gh pr create --title "Version bump to $new_version" --body "Automated version bump" --base trunk --head version-bump-$new_version)
             echo "Created PR: $pr_url"
             # Automatically merge the PR into "trunk"
             gh pr merge version-bump-$new_version --auto --squash --delete-branch
+
       - run:
           name: Sign Artifacts and Generate Checksums
           command: |
