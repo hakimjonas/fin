@@ -130,16 +130,6 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Install GitHub CLI
-          command: |
-            set -euo pipefail
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
-              gpg --dearmor | \
-              sudo tee /usr/share/keyrings/githubcli-archive-keyring.gpg > /dev/null
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
-              sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-            sudo apt update && sudo apt install gh -y
-      - run:
           name: Configure GPG
           command: |
             set -euo pipefail
