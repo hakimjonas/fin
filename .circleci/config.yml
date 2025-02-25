@@ -26,15 +26,7 @@ jobs:
               echo "FINE_SIGNATURE_PASSPHRASE is not set!"
               exit 1
             fi
-            if [ -z "$CIRCLE_TAG" ]; then
-              echo "CIRCLE_TAG is not set! This job must be triggered by a tag."
-              exit 1
-            fi
-            if [ -z "$CIRCLE_SHA1" ]; then
-              echo "CIRCLE_SHA1 is not set!"
-              exit 1
-            fi
-            echo "All required environment variables (GH_TOKEN, FINE_SIGNATURE_KEY_B64, FINE_SIGNATURE_PASSPHRASE, CIRCLE_TAG, CIRCLE_SHA1) are set."
+            echo "All required environment variables are set."
       - run:
           name: Test GPG Key Import
           command: |
@@ -192,15 +184,15 @@ jobs:
           command: |
             current_version=$(grep 'version *= *"' Cargo.toml | head -n1 | sed 's/.*version *= *"//;s/".*//')
             echo "Current version: $current_version"
-            IFS='.' read -r major minor patch  \<<< "$current_version"
+            IFS='.' read -r major minor patch <<< "$current_version"
             new_patch=$((patch + 1))
             new_version="${major}.${minor}.${new_patch}"
+            new_version=$(echo "$new_version" | tr -d '[:space:]')
             echo "Bumping version from $current_version to $new_version"
             
             sed -i "s/version = \"$current_version\"/version = \"$new_version\"/" Cargo.toml
             echo "## [${new_version}] - $(date +%Y-%m-%d)" | cat - CHANGELOG.md > temp && mv temp CHANGELOG.md
-            sed -i "s/fin-$current_version/fin-$new_version/g" INSTALL.md
-            sed -i "s/fin_$current_version/fin_$new_version/g" INSTALL.md
+            sed -i -E "s/\bfin[-_]"$current_version"\b/fin-$new_version/g" INSTALL.md
             sed -E -i "s/pkgver=[0-9]+\.[0-9]+\.[0-9]+/pkgver=$new_version/g" PKGBUILD
             sed -E -i "s/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz/v$new_version.tar.gz/g" PKGBUILD
             sed -E -i "s/version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"$new_version\"/g" flake.nix
@@ -236,13 +228,7 @@ jobs:
       - run:
           name: Create GitHub Release
           command: |
-            if gh release view "${CIRCLE_TAG}" > /dev/null 2>&1; then
-              echo "Release for ${CIRCLE_TAG} already exists. Updating release..."
-              gh release edit "${CIRCLE_TAG}" --notes-file CHANGELOG.md --title "Release ${CIRCLE_TAG}"
-            else
-              echo "Creating release for ${CIRCLE_TAG}..."
-              gh release create "${CIRCLE_TAG}" --notes-file CHANGELOG.md --title "Release ${CIRCLE_TAG}" --target "${CIRCLE_SHA1}"
-            fi
+            gh release create ${CIRCLE_TAG} --notes-file CHANGELOG.md --title "Release ${CIRCLE_TAG}"
       - run:
           name: Upload Artifacts
           command: |
@@ -255,18 +241,18 @@ workflows:
   build_test_release:
     jobs:
       - env_check
-      - audit
       - lint:
-          requires: [ audit, env_check ]
+          requires: [ env_check ]
       - test:
-          requires: [ audit, env_check ]
+          requires: [ env_check, lint ]
       - build:
-          requires: [ audit, env_check ]
-
+          requires: [ env_check, test ]
+      - audit:
+          requires: [ env_check, lint, test, build ]
       - package:
-          requires: [ build, lint, test ]
+          requires: [ env_check, audit ]
       - release:
-          requires: [ package ]
+          requires: [ env_check, package ]
           filters:
             tags:
               only: /^v.*/
