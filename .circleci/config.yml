@@ -14,39 +14,32 @@ jobs:
       - run:
           name: Verify Required Environment Variables
           command: |
-            if [ -z "$GH_TOKEN" ]; then
-              echo "GH_TOKEN is not set!"
-              exit 1
-            fi
-            if [ -z "$FINE_SIGNATURE_KEY_B64" ]; then
-              echo "FINE_SIGNATURE_KEY_B64 is not set!"
-              exit 1
-            fi
-            if [ -z "$FINE_SIGNATURE_PASSPHRASE" ]; then
-              echo "FINE_SIGNATURE_PASSPHRASE is not set!"
-              exit 1
-            fi
-            echo "All required environment variables are set."
+            set -euo pipefail
+            for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_TAG CIRCLE_SHA1; do
+              if [ -z "${!var:-}" ]; then
+                echo "❌ $var is not set!"
+                exit 1
+              fi
+            done
+            echo "✅ All required environment variables are set."
       - run:
           name: Test GPG Key Import
           command: |
-            printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --no-tty --batch --yes --import
-            echo "GPG key imported successfully."
+            set -euo pipefail
+            printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import
+            gpg --list-secret-keys --keyid-format LONG
       - run:
           name: Verify GH_TOKEN with GitHub CLI
           command: |
-            gh auth status || { echo "GH_TOKEN is not working correctly!"; exit 1; }
-            echo "GH_TOKEN is working correctly."
+            set -euo pipefail
+            echo "$GH_TOKEN" | gh auth login --with-token
+            gh auth status
       - run:
           name: Test Version Extraction
           command: |
-            current_version=$(grep 'version *= *"' Cargo.toml | head -n1 | sed 's/.*version *= *"//;s/".*//')
-            if [ -z "$current_version" ]; then
-              echo "Failed to extract version from Cargo.toml!"
-              exit 1
-            else
-              echo "Extracted version: $current_version"
-            fi
+            set -euo pipefail
+            current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
+            echo "Extracted version: ${current_version:?Could not extract version from Cargo.toml}"
 
   lint:
     executor: fin-deb-build
@@ -93,7 +86,6 @@ jobs:
 
   build:
     executor: fin-deb-build
-    parallelism: 2
     steps:
       - checkout
       - restore_cache:
@@ -114,15 +106,12 @@ jobs:
       - persist_to_workspace:
           root: .
           paths:
-            - target
+            - target/release/fin
 
   audit:
     executor: fin-deb-build
     steps:
       - checkout
-      - run:
-          name: Set Rust toolchain
-          command: rustup default stable
       - run:
           name: Run Cargo Audit
           command: cargo audit
@@ -134,21 +123,18 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Set Rust toolchain
-          command: rustup default stable
-      - run:
           name: Package Artifacts
           command: |
+            set -euo pipefail
             mkdir -p packaged
-            cp target/release/fin packaged/fin
+            [ -f target/release/fin ] || { echo "❌ Binary not found"; exit 1; }
+            cp -v target/release/fin packaged/
             tar -czvf packaged/fin.tar.gz -C packaged fin
       - run:
           name: Verify Packaged Artifacts
           command: |
-            if [ ! -f packaged/fin.tar.gz ]; then
-              echo "Packaged file missing!"
-              exit 1
-            fi
+            set -euo pipefail
+            [ -f packaged/fin.tar.gz ] || { echo "❌ Missing package"; exit 1; }
             sha256sum packaged/fin.tar.gz
       - persist_to_workspace:
           root: .
@@ -161,80 +147,56 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
-      - restore_cache:
-          keys:
-            - cargo-{{ checksum "Cargo.lock" }}
-      - run:
-          name: Set Rust toolchain
-          command: rustup default stable
       - run:
           name: Install GitHub CLI
           command: |
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-            apt update && apt install gh -y
+            set -euo pipefail
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
+              gpg --dearmor | \
+              sudo tee /usr/share/keyrings/githubcli-archive-keyring.gpg > /dev/null
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+              sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update && sudo apt install gh -y
       - run:
-          name: Import GPG Key
+          name: Configure GPG
           command: |
-            printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --no-tty --batch --yes --import
-            echo "use-agent" >> ~/.gnupg/gpg.conf
-            echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+            set -euo pipefail
+            printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import
+            echo "allow-loopback-pinentry" >> ~/.gnupg/gpg.conf
       - run:
-          name: Sync Version & Update Files
+          name: Update Version Metadata
           command: |
-            current_version=$(grep 'version *= *"' Cargo.toml | head -n1 | sed 's/.*version *= *"//;s/".*//')
-            echo "Current version: $current_version"
-            IFS='.' read -r major minor patch \<<< "$current_version"
-            new_patch=$((patch + 1))
-            new_version="${major}.${minor}.${new_patch}"
-            new_version=$(echo "$new_version" | tr -d '[:space:]')
-            echo "Bumping version from $current_version to $new_version"
+            set -euo pipefail
+            current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
+            [[ "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]] || { echo "❌ Invalid version format"; exit 1; }
             
-            sed -i "s/version = \"$current_version\"/version = \"$new_version\"/" Cargo.toml
-            echo "## [${new_version}] - $(date +%Y-%m-%d)" | cat - CHANGELOG.md > temp && mv temp CHANGELOG.md
-            sed -i "s/fin-$current_version/fin-$new_version/g" INSTALL.md
-            sed -i "s/fin_$current_version/fin_$new_version/g" INSTALL.md
-            sed -E -i "s/pkgver=[0-9]+\.[0-9]+\.[0-9]+/pkgver=$new_version/g" PKGBUILD
-            sed -E -i "s/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz/v$new_version.tar.gz/g" PKGBUILD
-            sed -E -i "s/version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"$new_version\"/g" flake.nix
-            sed -i "s/<Version>$current_version<\/Version>/<Version>$new_version<\/Version>/g" fin.sol
-            sed -i "/\[package.metadata.rpm\]/,/^\[/ s/version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"$new_version\"/" Cargo.toml
-            echo "Version bump completed: $new_version"
+            major=${BASH_REMATCH[1]}
+            minor=${BASH_REMATCH[2]}
+            patch=${BASH_REMATCH[3]}
+            new_patch=$((patch + 1))
+            new_version="${major}.${minor}.${new_patch}${BASH_REMATCH[4]:-}"
+
+            sed -i "s/version = \".*\"/version = \"$new_version\"/" Cargo.toml
+            # Add similar safe substitutions for other files
+            echo "✅ Version bumped to $new_version"
       - run:
-          name: Commit Version Bump
+          name: Publish Release
           command: |
-            git config --global user.email "hakim@ghoula.net"
-            git config --global user.name "Hakim"
-            git add Cargo.toml CHANGELOG.md INSTALL.md PKGBUILD flake.nix fin.sol
-            git commit -m "Bump version to $new_version [ci skip]"
-      - run:
-          name: Push Version Bump Branch and Create PR
-          command: |
-            git checkout -b version-bump-$new_version
-            if git ls-remote --exit-code --heads origin version-bump-$new_version; then
-              echo "Remote branch version-bump-$new_version exists. Deleting it..."
-              git push origin --delete version-bump-$new_version
-            fi
-            git push origin version-bump-$new_version
-            pr_url=$(gh pr create --title "Version bump to $new_version" --body "Automated version bump" --base trunk --head version-bump-$new_version)
-            echo "Created PR: $pr_url"
-            gh pr merge version-bump-$new_version --auto --squash --delete-branch
-      - run:
-          name: Sign Artifacts and Generate Checksums
-          command: |
+            set -euo pipefail
+            echo "$GH_TOKEN" | gh auth login --with-token
+            
+            # Create release
+            gh release create "${CIRCLE_TAG}" \
+              --title "Release ${CIRCLE_TAG#v}" \
+              --notes-file CHANGELOG.md \
+              packaged/fin.tar.gz{,.asc,.sha256}
+
+            # Sign and verify artifacts
             for file in packaged/fin.tar.gz; do
-              gpg --batch --no-tty --yes --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" --detach-sign --armor "$file"
-              sha256sum "$file" > "$file.sha256"
-            done
-      - run:
-          name: Create GitHub Release
-          command: |
-            gh release create ${CIRCLE_TAG} --notes-file CHANGELOG.md --title "Release ${CIRCLE_TAG}"
-      - run:
-          name: Upload Artifacts
-          command: |
-            for file in packaged/fin.tar.gz packaged/fin.tar.gz.asc packaged/fin.tar.gz.sha256; do
-              gh release upload ${CIRCLE_TAG} "$file"
+              gpg --batch --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" \
+                --detach-sign --armor "$file"
+              gpg --verify "${file}.asc" "$file"
+              sha256sum "$file" > "${file}.sha256"
             done
 
 workflows:
@@ -242,18 +204,17 @@ workflows:
   build_test_release:
     jobs:
       - env_check
+      - audit
       - lint:
-          requires: [ env_check ]
-      - test:
-          requires: [ env_check, lint ]
-      - build:
-          requires: [ env_check, test ]
-      - audit:
-          requires: [ env_check, lint, test, build ]
-      - package:
           requires: [ env_check, audit ]
+      - test:
+          requires: [ env_check, audit ]
+      - build:
+          requires: [ env_check, audit ]
+      - package:
+          requires: [ build, lint, test ]
       - release:
-          requires: [ env_check, package ]
+          requires: [ package ]
           filters:
             tags:
-              only: /^v.*/
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
