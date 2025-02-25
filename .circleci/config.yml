@@ -37,6 +37,18 @@ jobs:
           command: |
             gh auth status || { echo "GH_TOKEN is not working correctly!"; exit 1; }
             echo "GH_TOKEN is working correctly."
+      - run:
+          name: Test Version Extraction
+          command: |
+            # Attempt to extract the version from Cargo.toml
+            current_version=$(grep 'version *= *"' Cargo.toml | head -n1 | sed 's/.*version *= *"//;s/".*//')
+            if [ -z "$current_version" ]; then
+              echo "Failed to extract version from Cargo.toml!"
+              exit 1
+            else
+              echo "Extracted version: $current_version"
+            fi
+  
 
   lint:
     executor: fin-deb-build
@@ -169,45 +181,8 @@ jobs:
             printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --no-tty --batch --yes --import
             echo "use-agent" >> ~/.gnupg/gpg.conf
             echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
-      - run:
-          name: Sync Version & Update Files
-          command: |
-            current_version=$(grep 'version *= *"' Cargo.toml | head -n1 | sed 's/.*version *= *"//;s/".*//')
-            echo "Current version: $current_version"
-            IFS='.' read -r major minor patch  \<<< "$current_version"
-            new_patch=$((patch + 1))
-            new_version="${major}.${minor}.${new_patch}"
-            echo "Bumping version from $current_version to $new_version"
-            
-            sed -i "s/version = \"$current_version\"/version = \"$new_version\"/" Cargo.toml
-            echo "## [${new_version}] - $(date +%Y-%m-%d)" | cat - CHANGELOG.md > temp && mv temp CHANGELOG.md
-            sed -i "s/fin-$current_version/fin-$new_version/g" INSTALL.md
-            sed -i "s/fin_$current_version/fin_$new_version/g" INSTALL.md
-            sed -E -i "s/pkgver=[0-9]+\.[0-9]+\.[0-9]+/pkgver=$new_version/g" PKGBUILD
-            sed -E -i "s/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz/v$new_version.tar.gz/g" PKGBUILD
-            sed -E -i "s/version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"$new_version\"/g" flake.nix
-            sed -i "s/<Version>$current_version<\/Version>/<Version>$new_version<\/Version>/g" fin.sol
-            sed -i "/\[package.metadata.rpm\]/,/^\[/ s/version = \"[0-9]+\.[0-9]+\.[0-9]+\"/version = \"$new_version\"/" Cargo.toml
             echo "Version bump completed: $new_version"
-      - run:
-          name: Commit Version Bump
-          command: |
-            git config --global user.email "hakim@ghoula.net"
-            git config --global user.name "Hakim"
-            git add Cargo.toml CHANGELOG.md INSTALL.md PKGBUILD flake.nix fin.sol
-            git commit -m "Bump version to $new_version [ci skip]"
-      - run:
-          name: Push Version Bump Branch and Create PR
-          command: |
-            git checkout -b version-bump-$new_version
-            if git ls-remote --exit-code --heads origin version-bump-$new_version; then
-              echo "Remote branch version-bump-$new_version exists. Deleting it..."
-              git push origin --delete version-bump-$new_version
-            fi
-            git push origin version-bump-$new_version
-            pr_url=$(gh pr create --title "Version bump to $new_version" --body "Automated version bump" --base trunk --head version-bump-$new_version)
-            echo "Created PR: $pr_url"
-            gh pr merge version-bump-$new_version --auto --squash --delete-branch
+
       - run:
           name: Sign Artifacts and Generate Checksums
           command: |
@@ -238,7 +213,7 @@ workflows:
       - build:
           requires: [ env_check, ]
       - audit:
-          requires: [ env_check, lint, test, build ]
+          requires: [ lint, test, build ]
       - package:
           requires: [ audit ]
       - release:
