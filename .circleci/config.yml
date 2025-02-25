@@ -164,8 +164,7 @@ jobs:
       - run:
           name: Upload Artifacts
           command: |
-            find packaged -type f -name "fin.tar.gz" -exec gh release upload ${CIRCLE_TAG} {} \;
-
+            for file in packaged/fin.tar.gz packaged/fin-*.tar.gz packaged/fin-*.deb; do gh release upload ${CIRCLE_TAG} "$file"; done
 workflows:
   version: 2
   build_test_release:
