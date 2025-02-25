@@ -123,66 +123,66 @@ jobs:
           paths:
             - packaged
 
-    release:
-      executor: fin-deb-build
-      steps:
-        - checkout
-        - attach_workspace:
-            at: .
-        - run:
-            name: Install GitHub CLI
-            command: |
-              set -euo pipefail
-              curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
-                gpg --dearmor | \
-                sudo tee /usr/share/keyrings/githubcli-archive-keyring.gpg > /dev/null
-              echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
-                sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-              sudo apt update && sudo apt install gh -y
-        - run:
-            name: Configure GPG
-            command: |
-              set -euo pipefail
-              printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import
-              echo "allow-loopback-pinentry" >> ~/.gnupg/gpg.conf
-        - run:
-            name: Update Version Metadata
-            command: |
-              set -euo pipefail
-              current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
-              [[ "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]] || { echo "❌ Invalid version format"; exit 1; }
-              
-              major=${BASH_REMATCH[1]}
-              minor=${BASH_REMATCH[2]}
-              patch=${BASH_REMATCH[3]}
-              new_patch=$((patch + 1))
-              new_version="${major}.${minor}.${new_patch}${BASH_REMATCH[4]:-}"
-              
-              sed -i "s/version = \".*\"/version = \"$new_version\"/" Cargo.toml
-              echo "✅ Version bumped to $new_version"
-              echo "export RELEASE_VERSION=$new_version" >> $BASH_ENV
-        - run:
-            name: Publish Release
-            command: |
-              set -euo pipefail
-              echo "$GH_TOKEN" | gh auth login --with-token
-              
-              # Extract the updated version from Cargo.toml
-              current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
-              
-              # Create release using the version from Cargo.toml
-              gh release create "v${current_version}" \
-                --title "Release ${current_version}" \
-                --notes-file CHANGELOG.md \
-                packaged/fin.tar.gz{,.asc,.sha256}
-              
-              # Sign and verify artifacts
-              for file in packaged/fin.tar.gz; do
-                gpg --batch --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" \
-                  --detach-sign --armor "$file"
-                gpg --verify "${file}.asc" "$file"
-                sha256sum "$file" > "${file}.sha256"
-              done
+  release:
+    executor: fin-deb-build
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Install GitHub CLI
+          command: |
+            set -euo pipefail
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
+              gpg --dearmor | \
+              sudo tee /usr/share/keyrings/githubcli-archive-keyring.gpg > /dev/null
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+              sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update && sudo apt install gh -y
+      - run:
+          name: Configure GPG
+          command: |
+            set -euo pipefail
+            printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import
+            echo "allow-loopback-pinentry" >> ~/.gnupg/gpg.conf
+      - run:
+          name: Update Version Metadata
+          command: |
+            set -euo pipefail
+            current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
+            [[ "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]] || { echo "❌ Invalid version format"; exit 1; }
+
+            major=${BASH_REMATCH[1]}
+            minor=${BASH_REMATCH[2]}
+            patch=${BASH_REMATCH[3]}
+            new_patch=$((patch + 1))
+            new_version="${major}.${minor}.${new_patch}${BASH_REMATCH[4]:-}"
+
+            sed -i "s/version = \".*\"/version = \"$new_version\"/" Cargo.toml
+            echo "✅ Version bumped to $new_version"
+            echo "export RELEASE_VERSION=$new_version" >> $BASH_ENV
+      - run:
+          name: Publish Release
+          command: |
+            set -euo pipefail
+            echo "$GH_TOKEN" | gh auth login --with-token
+
+            # Extract the updated version from Cargo.toml
+            current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
+
+            # Create release using the version from Cargo.toml
+            gh release create "v${current_version}" \
+              --title "Release ${current_version}" \
+              --notes-file CHANGELOG.md \
+              packaged/fin.tar.gz{,.asc,.sha256}
+
+            # Sign and verify artifacts
+            for file in packaged/fin.tar.gz; do
+              gpg --batch --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" \
+                --detach-sign --armor "$file"
+              gpg --verify "${file}.asc" "$file"
+              sha256sum "$file" > "${file}.sha256"
+            done
 
 workflows:
   version: 2
