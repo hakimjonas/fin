@@ -193,7 +193,15 @@ jobs:
       - run:
           name: Create GitHub Release
           command: |
-            gh release create ${CIRCLE_TAG} --notes-file CHANGELOG.md --title "Release ${CIRCLE_TAG}"
+            # Check if a release for this tag already exists.
+            if gh release view "${CIRCLE_TAG}" > /dev/null 2>&1; then
+              echo "Release for ${CIRCLE_TAG} already exists. Updating release..."
+              gh release edit "${CIRCLE_TAG}" --notes-file CHANGELOG.md --title "Release ${CIRCLE_TAG}"
+            else
+              echo "Creating release for ${CIRCLE_TAG}..."
+              gh release create "${CIRCLE_TAG}" --notes-file CHANGELOG.md --title "Release ${CIRCLE_TAG}" --target "${CIRCLE_SHA1}"
+            fi
+
       - run:
           name: Upload Artifacts
           command: |
