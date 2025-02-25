@@ -234,7 +234,7 @@ jobs:
             git checkout -b "$branch"
             git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md
             git commit -m "chore: bump version to $new_version"
-            git push origin "$branch"
+            git push --force origin "$branch"
       - run:
           name: Sign Artifacts and Generate Checksums
           command: |
