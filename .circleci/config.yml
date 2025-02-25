@@ -234,15 +234,15 @@ workflows:
       - lint:
           requires: [ env_check ]
       - test:
-          requires: [ env_check, lint ]
+          requires: [ env_check ]
       - build:
-          requires: [ env_check, test ]
+          requires: [ env_check, ]
       - audit:
           requires: [ env_check, lint, test, build ]
       - package:
-          requires: [ env_check, audit ]
+          requires: [ audit ]
       - release:
-          requires: [ env_check, package ]
+          requires: [ package ]
           filters:
             tags:
               only: /^v.*/
