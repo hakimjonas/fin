@@ -132,9 +132,10 @@ jobs:
       - run:
           name: Import GPG Key
           command: |
-            printf '%s' "$FINE_SIGNATURE_KEY" | gpg --import
+            printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --import
             echo "use-agent" >> ~/.gnupg/gpg.conf
             echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+
       - run:
           name: Sync Version & Update Files
           command: |
