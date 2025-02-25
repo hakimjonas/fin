@@ -132,7 +132,7 @@ jobs:
       - run:
           name: Import GPG Key
           command: |
-            echo "$FINE_SIGNATURE_KEY" | gpg --import
+            printf '%s' "$FINE_SIGNATURE_KEY" | gpg --import
             echo "use-agent" >> ~/.gnupg/gpg.conf
             echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
       - run:
