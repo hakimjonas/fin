@@ -1,0 +1,64 @@
+version: 2.1
+
+executors:
+  fin-deb-build:
+    docker:
+      - image: hakimjonas/fin-deb-build
+    working_directory: /workspace
+
+jobs:
+  publish:
+    executor: fin-deb-build
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - cargo-{{ checksum "Cargo.lock" }}
+      - run:
+          name: Set Rust Toolchain
+          command: rustup default stable
+      - run:
+          name: Determine Latest Release Version
+          command: |
+            # Use the GitHub CLI to fetch the latest release tag.
+            latest_version=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
+            if [ -z "$latest_version" ]; then
+              echo "No release found. Exiting."
+              exit 1
+            fi
+            echo "Latest release version is: $latest_version"
+            # Export the version for subsequent steps.
+            echo "export LATEST_VERSION=$latest_version" >> $BASH_ENV
+      - run:
+          name: Build Artifacts (if needed)
+          command: |
+            # Optionally build or verify artifacts here. If your artifacts were already built in your release workflow,
+            # you might simply attach them from the workspace.
+            echo "Artifacts for version $LATEST_VERSION are assumed to be present."
+      - run:
+          name: Sign Artifacts and Generate Checksums
+          command: |
+            # Example: Sign Debian packages and generate SHA256 checksums.
+            for file in target/debian/fin_*_amd64.deb; do
+              gpg --detach-sign --armor "$file"
+              sha256sum "$file" > "$file.sha256"
+            done
+      - run:
+          name: Publish Artifacts to GitHub Release
+          command: |
+            echo "Uploading artifacts for version $LATEST_VERSION"
+            # Adjust the patterns below to match all your distribution packages.
+            for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
+              gh release upload $LATEST_VERSION "$file" || true
+              gh release upload $LATEST_VERSION "$file.asc" || true
+              gh release upload $LATEST_VERSION "$file.sha256" || true
+            done
+
+workflows:
+  version: 2
+  publish_workflow:
+    jobs:
+      - publish:
+          filters:
+            tags:
+              only: /^v.*/
