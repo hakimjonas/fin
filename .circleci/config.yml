@@ -87,8 +87,7 @@ jobs:
       - run:
           name: Package Artifacts
           command: |
-            # Replace this with your packaging logic.
-            # For example, you might run cargo deb or tar up your release binary.
+            # Example packaging logic: copy the release binary and create a tarball.
             mkdir -p packaged
             cp target/release/fin packaged/fin
             tar -czvf packaged/fin.tar.gz -C packaged fin
@@ -114,7 +113,7 @@ jobs:
           command: |
             # Extract current version from Cargo.toml (assumes format: version = "X.Y.Z")
             current_version=$(grep '^version' Cargo.toml | head -n1 | sed 's/version = "//;s/".*//')
-            IFS='.' read -r major minor patch \<<< "$current_version"
+            IFS='.' read -r major minor patch <<< "$current_version"
             new_patch=$((patch + 1))
             new_version="${major}.${minor}.${new_patch}"
             echo "Bumping version from $current_version to $new_version"
@@ -139,8 +138,32 @@ jobs:
             sed -i "s/<Version>$current_version<\/Version>/<Version>$new_version<\/Version>/g" fin.sol
             
             echo "Version bump completed: $new_version"
-
-
+      - run:
+          name: Commit Version Bump
+          command: |
+            git config --global user.email "ci@yourdomain.com"
+            git config --global user.name "CI Bot"
+            git add Cargo.toml CHANGELOG.md INSTALL.md PKGBUILD flake.nix fin.sol
+            git commit -m "Bump version to $new_version [ci skip]"
+      - run:
+          name: Push Version Bump Branch
+          command: |
+            git checkout -b version-bump-$new_version
+            git push origin version-bump-$new_version
+      - run:
+          name: Create and Merge Automatic PR
+          command: |
+            pr_url=$(gh pr create --title "Version bump to $new_version" --body "Automated version bump" --base ${CIRCLE_BRANCH} --head version-bump-$new_version)
+            echo "Created PR: $pr_url"
+            gh pr merge version-bump-$new_version --auto --squash --delete-branch
+      - run:
+          name: Create GitHub Release
+          command: |
+            gh release create ${CIRCLE_TAG} --notes-file CHANGELOG.md --title "Release ${CIRCLE_TAG}"
+      - run:
+          name: Upload Artifacts
+          command: |
+            find packaged -type f -name "fin.tar.gz" -exec gh release upload ${CIRCLE_TAG} {} \;
 
 workflows:
   version: 2
