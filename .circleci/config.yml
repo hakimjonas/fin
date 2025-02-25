@@ -154,6 +154,16 @@ jobs:
             echo "✅ Version bumped to $new_version"
             echo "export RELEASE_VERSION=$new_version" >> $BASH_ENV
       - run:
+          name: Sign Artifacts and Generate Checksums
+          command: |
+            set -euo pipefail
+            for file in packaged/fin.tar.gz; do
+              gpg --batch --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" \
+                --detach-sign --armor "$file"
+              gpg --verify "${file}.asc" "$file"
+              sha256sum "$file" > "${file}.sha256"
+            done
+      - run:
           name: Publish Release
           command: |
             set -euo pipefail
@@ -167,15 +177,8 @@ jobs:
             gh release create "v${current_version}" \
               --title "Release ${current_version}" \
               --notes-file CHANGELOG.md \
-              packaged/fin.tar.gz{,.asc,.sha256}
+              packaged/fin.tar.gz packaged/fin.tar.gz.asc packaged/fin.tar.gz.sha256
 
-            # Sign artifacts with explicit pinentry flag
-            for file in packaged/fin.tar.gz; do
-              gpg --batch --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" \
-                --detach-sign --armor "$file"
-              gpg --verify "${file}.asc" "$file"
-              sha256sum "$file" > "${file}.sha256"
-            done
 
 workflows:
   version: 2
