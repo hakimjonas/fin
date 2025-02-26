@@ -193,83 +193,64 @@ jobs:
             printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import
             echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf  # Safer directive
       - run:
-          name: Update Version Metadata and Commit Bump
+          name: Release Actions
           command: |
             set -euo pipefail
-            # Read the current version from Cargo.toml
-            current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
-            if [[ ! "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
-              echo "❌ Invalid version format in Cargo.toml"
-              exit 1
+            # Determine the version to use:
+            if [ -n "${CIRCLE_TAG:-}" ]; then
+                # Use the tag version; strip a leading "v" if present.
+                tag_version="${CIRCLE_TAG#v}"
+                new_version="$tag_version"
+                echo "Tag detected: using provided version $new_version"
+            else
+                # No tag: auto bump the version from Cargo.toml.
+                current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
+                if [[ ! "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
+                  echo "❌ Invalid version format in Cargo.toml"
+                  exit 1
+                fi
+                major=${BASH_REMATCH[1]}
+                minor=${BASH_REMATCH[2]}
+                patch=${BASH_REMATCH[3]}
+                new_patch=$((patch + 1))
+                new_version="${major}.${minor}.${new_patch}${BASH_REMATCH[4]:-}"
+                echo "No tag detected: auto bump version from $current_version to $new_version"
             fi
-            major=${BASH_REMATCH[1]}
-            minor=${BASH_REMATCH[2]}
-            patch=${BASH_REMATCH[3]}
-            new_patch=$((patch + 1))
-            new_version="${major}.${minor}.${new_patch}${BASH_REMATCH[4]:-}"
             
-            # Update Cargo.toml
+            # Update version in all files:
             sed -i "s/^version *= *\".*\"/version = \"$new_version\"/" Cargo.toml
-            
-            # Update PKGBUILD (expects a line like: pkgver=0.2.5)
             sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD
-            
-            # Update fin.sol (expects a line like: version: "0.2.5")
             sed -i "s/^version: *\".*\"/version: \"$new_version\"/" fin.sol
-            
-            # Update flake.nix (expects a line like: version = "0.2.5";)
             sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
-            
-            # Update INSTALL.md (expects a line starting with 'Version:')
             sed -i "s/^Version: .*/Version: $new_version/" INSTALL.md
-            
-            echo "✅ Version bumped to $new_version in Cargo.toml, PKGBUILD, fin.sol, flake.nix, and INSTALL.md"
+            echo "✅ Updated version in all files to $new_version"
             echo "export RELEASE_VERSION=$new_version" >> $BASH_ENV
-
-            # Configure Git for automated commit
+            
+            # Configure Git and commit the version bump on a new branch.
             git config user.email "ci-bot@example.com"
             git config user.name "CI Bot"
-
-            # Commit the version bump on a new branch
             branch="version-bump-$new_version"
             git checkout -b "$branch"
             git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md
             git commit -m "chore: bump version to $new_version"
             git push --force origin "$branch"
-      - run:
-          name: Sign Artifacts and Generate Checksums
-          command: |
-            set -euo pipefail
-            for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
-              if [ -f "$file" ]; then
-                gpg --batch --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" --detach-sign --armor "$file"
-                sha256sum "$file" > "$file.sha256"
-              fi
-            done
-      - run:
-          name: Publish Release
-          command: |
-            set -euo pipefail
-            # Authenticate with GitHub
-            GITHUB_TOKEN_VALUE="$GH_TOKEN"
-            unset GH_TOKEN
-            echo "$GITHUB_TOKEN_VALUE" | gh auth login --with-token
-
-            current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
-            gh release create "v${current_version}" \
-              --title "Release ${current_version}" \
+            
+            # Create a PR for the version bump.
+            pr_title="chore: version bump to $new_version"
+            pr_body="Automated version bump to $new_version."
+            gh pr create --title "$pr_title" --body "$pr_body" --base main --head "$branch"
+            
+            # Authenticate with GitHub for release creation.
+            echo "$GH_TOKEN" | gh auth login --with-token
+            
+            # Create GitHub release using the version (prefix with "v").
+            gh release create "v$new_version" \
+              --title "Release v$new_version" \
               --notes-file CHANGELOG.md \
               target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz \
               target/debian/fin_*_amd64.deb.asc target/fin-*-arch.tar.gz.asc target/fin-*-solus.tar.gz.asc target/fin-*-nix.tar.gz.asc \
               target/debian/fin_*_amd64.deb.sha256 target/fin-*-arch.tar.gz.sha256 target/fin-*-solus.tar.gz.sha256 target/fin-*-nix.tar.gz.sha256
-      - run:
-          name: Create Version Bump PR
-          command: |
-            set -euo pipefail
-            current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
-            pr_title="chore: version bump to $current_version"
-            pr_body="Automated version bump to $current_version."
-            gh pr create --title "$pr_title" --body "$pr_body" --base main --head "version-bump-$current_version"
+
 
 workflows:
   version: 2
@@ -289,6 +270,6 @@ workflows:
           requires: [ package ]
           filters:
             branches:
-              ignore: /.*/      # ignore branch triggers
+              only: [ main ]
             tags:
-              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/   # trigger only on version tags
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
