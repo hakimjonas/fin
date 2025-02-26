@@ -22,10 +22,6 @@ jobs:
               fi
             done
             echo "✅ All required environment variables are set."
-      - run:
-          name: Authenticate GitHub CLI
-          command: |
-            echo "$GH_TOKEN" | gh auth login --with-token
 
       - run:
           name: Test Version Bump Sed Patterns
