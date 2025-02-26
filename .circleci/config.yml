@@ -190,23 +190,23 @@ jobs:
             set -euo pipefail
             # Determine the version to use:
             if [ -n "${CIRCLE_TAG:-}" ]; then
-                tag_version="${CIRCLE_TAG#v}"
-                new_version="$tag_version"
-                echo "Tag detected: using provided version $new_version"
+            tag_version="${CIRCLE_TAG#v}"
+            new_version="$tag_version"
+            echo "Tag detected: using provided version $new_version"
             else
-                current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
-                if [[ ! "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
-                  echo "❌ Invalid version format in Cargo.toml"
-                  exit 1
-                fi
-                major=${BASH_REMATCH[1]}
-                minor=${BASH_REMATCH[2]}
-                patch=${BASH_REMATCH[3]}
-                new_patch=$((patch + 1))
-                new_version="${major}.${minor}.${new_patch}${BASH_REMATCH[4]:-}"
-                echo "No tag detected: auto bump version from $current_version to $new_version"
+            current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
+            if [[ ! "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
+            echo "❌ Invalid version format in Cargo.toml"
+            exit 1
             fi
-
+            major=${BASH_REMATCH[1]}
+            minor=${BASH_REMATCH[2]}
+            patch=${BASH_REMATCH[3]}
+            new_patch=$((patch + 1))
+            new_version="${major}.${minor}.${new_patch}${BASH_REMATCH[4]:-}"
+            echo "No tag detected: auto bump version from $current_version to $new_version"
+            fi
+            
             # Update version in all files.
             sed -i "s/^version *= *\".*\"/version = \"$new_version\"/" Cargo.toml
             sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD
@@ -216,13 +216,13 @@ jobs:
             sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +'%Y-%m-%d')/" CHANGELOG.md || true
             echo "✅ Updated version in all files to $new_version"
             echo "export RELEASE_VERSION=$new_version" >> $BASH_ENV
-
+            
             # Check if Cargo.lock has any changes
             if ! git diff --quiet Cargo.lock; then
-              echo "Cargo.lock has been modified. Adding to commit."
-              git add Cargo.lock
+            echo "Cargo.lock has been modified. Adding to commit."
+            git add Cargo.lock
             fi
-
+            
             # Configure Git and commit the version bump on a new branch.
             git config user.email "ci-bot@example.com"
             git config user.name "CI Bot"
@@ -231,46 +231,43 @@ jobs:
             git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md
             git commit -m "chore: bump version to $new_version [skip ci]"
             git push --force origin "$branch"
-
-            # Check if a PR for this bump already exists.
+            
+            # After creating the bump PR:
             existing_pr=$(gh pr list --head "version-bump-$new_version" --json number --jq '.[0].number')
             if [ -n "$existing_pr" ]; then
-              echo "A bump PR for version $new_version already exists (PR #$existing_pr). Skipping PR creation."
-            else
-              pr_title="chore: version bump to $new_version"
-              pr_body="Automated version bump to $new_version."
-              gh pr create --title "$pr_title" --body "$pr_body" --base trunk --head "$branch"
+            echo "A bump PR for version $new_version already exists (PR #$existing_pr). Skipping PR creation."
+            else 
+            pr_title="chore: version bump to $new_version"
+            pr_body="Automated version bump to $new_version."
+            gh pr create --title "$pr_title" --body "$pr_body" --base trunk --head "$branch"
             fi
             
-            # Clean up the working directory to remove any uncommitted changes (like Cargo.lock modifications).
+            # Clean up the working directory to ensure it is completely clean.
             git reset --hard HEAD
             git clean -fdx
-
+            
             # Re-run packaging now that version files are updated and the workspace is clean.
             cargo make package -- --allow-dirty
-
-            # Reset Cargo.lock to discard any modifications.
-            git reset --hard HEAD
-
-            # Re-run packaging now that version files are updated.
-            cargo make package -- --allow-dirty
-
+                                 
+            # Alternatively (if the above still complains about Cargo.lock), run:
+            cargo package --allow-dirty
+            
             # Authenticate with GitHub for release creation.
             echo "$GH_TOKEN" | gh auth login --with-token
 
             # Sign artifacts and generate checksums.
             for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
-              gpg --detach-sign --armor "$file"
-              sha256sum "$file" > "$file.sha256"
+            gpg --detach-sign --armor "$file"
+            sha256sum "$file" > "$file.sha256"
             done
 
             # Create GitHub release using the version (prefix with "v").
             gh release create "v$new_version" \
-              --title "Release v$new_version" \
-              --notes-file CHANGELOG.md \
-              target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz \
-              target/debian/fin_*_amd64.deb.asc target/fin-*-arch.tar.gz.asc target/fin-*-solus.tar.gz.asc target/fin-*-nix.tar.gz.asc \
-              target/debian/fin_*_amd64.deb.sha256 target/fin-*-arch.tar.gz.sha256 target/fin-*-solus.tar.gz.sha256 target/fin-*-nix.tar.gz.sha256
+            --title "Release v$new_version" \
+            --notes-file CHANGELOG.md \
+            target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz \
+            target/debian/fin_*_amd64.deb.asc target/fin-*-arch.tar.gz.asc target/fin-*-solus.tar.gz.asc target/fin-*-nix.tar.gz.asc \
+            target/debian/fin_*_amd64.deb.sha256 target/fin-*-arch.tar.gz.sha256 target/fin-*-solus.tar.gz.sha256 target/fin-*-nix.tar.gz.sha256
 
 
 workflows:
