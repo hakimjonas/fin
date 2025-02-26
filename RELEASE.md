@@ -9,7 +9,7 @@
 
 ## Manual Releases (Major/Minor Updates)
 
-    To manually update the version (e.g., for major or minor changes), push a tag (e.g., v0.2.5).
+    To manually update the version (e.g., for major or minor changes), push a tag (e.g., v0.3.0).
     The sync-version.sh script will use the provided version without auto bumping.
     Ensure that any necessary documentation is updated accordingly.
 

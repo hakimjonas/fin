@@ -231,8 +231,8 @@ jobs:
             pr_body="Automated version bump to $new_version."
             gh pr create --title "$pr_title" --body "$pr_body" --base trunk --head "$branch"
             
-            # Reset Cargo.lock to remove uncommitted changes.
-            git checkout -- Cargo.lock
+            # Reset Cargo.lock to discard any modifications.
+            git reset --hard HEAD
 
             # Re-run packaging now that version files are updated.
             cargo make package -- --allow-dirty
