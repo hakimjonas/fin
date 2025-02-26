@@ -27,7 +27,6 @@ jobs:
           command: |
             set -euo pipefail
             test_new_version="0.2.6"
-            
             sample_cargo='version = "0.2.5"'
             expected_cargo='version = "0.2.6"'
             result_cargo=$(echo "$sample_cargo" | sed "s/^version *= *\"[^\"]*\"/version = \"$test_new_version\"/")
@@ -35,7 +34,6 @@ jobs:
               echo "Cargo.toml sed pattern failed: got '$result_cargo', expected '$expected_cargo'"
               exit 1
             fi
-
             sample_pkgbuild='pkgver=0.2.5'
             expected_pkgbuild='pkgver=0.2.6'
             result_pkgbuild=$(echo "$sample_pkgbuild" | sed "s/^pkgver=.*/pkgver=$test_new_version/")
@@ -43,7 +41,6 @@ jobs:
               echo "PKGBUILD sed pattern failed: got '$result_pkgbuild', expected '$expected_pkgbuild'"
               exit 1
             fi
-
             sample_finsol='version: "0.2.5"'
             expected_finsol='version: "0.2.6"'
             result_finsol=$(echo "$sample_finsol" | sed "s/^version: *\"[^\"]*\"/version: \"$test_new_version\"/")
@@ -51,7 +48,6 @@ jobs:
               echo "fin.sol sed pattern failed: got '$result_finsol', expected '$expected_finsol'"
               exit 1
             fi
-
             sample_flake='  version = "0.2.5";'
             expected_flake='  version = "0.2.6";'
             result_flake=$(echo "$sample_flake" | sed "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$test_new_version\";/")
@@ -59,7 +55,6 @@ jobs:
               echo "flake.nix sed pattern failed: got '$result_flake', expected '$expected_flake'"
               exit 1
             fi
-
             sample_install='Version: 0.2.5'
             expected_install='Version: 0.2.6'
             result_install=$(echo "$sample_install" | sed "s/^Version: .*/Version: $test_new_version/")
@@ -67,7 +62,6 @@ jobs:
               echo "INSTALL.md sed pattern failed: got '$result_install', expected '$expected_install'"
               exit 1
             fi
-            
             echo "✅ All version bump sed patterns passed."
 
   lint:
@@ -145,37 +139,10 @@ jobs:
           name: Run Cargo Audit
           command: cargo audit
 
-  package:
-    executor: fin-deb-build
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - run:
-          name: Build Packages for All Distributions
-          command: |
-            set -euo pipefail
-            cargo make package -- --allow-dirty
-      - run:
-          name: Verify Packaged Artifacts
-          command: |
-            set -euo pipefail
-            ls -lh target/
-            [ -f target/debian/fin_*_amd64.deb ] || { echo "❌ Debian package missing"; exit 1; }
-            [ -f target/fin-*-arch.tar.gz ] || { echo "❌ Arch package missing"; exit 1; }
-            [ -f target/fin-*-solus.tar.gz ] || { echo "❌ Solus package missing"; exit 1; }
-            [ -f target/fin-*-nix.tar.gz ] || { echo "❌ Nix package missing"; exit 1; }
-      - persist_to_workspace:
-          root: .
-          paths:
-            - target/
-
   release:
     executor: fin-deb-build
     steps:
       - checkout
-      - attach_workspace:
-          at: .
       - run:
           name: Configure GPG
           command: |
@@ -188,7 +155,7 @@ jobs:
           name: Release Actions
           command: |
             set -euo pipefail
-            # Determine the version to use:
+            # Determine new version: use tag if provided; otherwise, auto bump.
             if [ -n "${CIRCLE_TAG:-}" ]; then
               tag_version="${CIRCLE_TAG#v}"
               new_version="$tag_version"
@@ -217,7 +184,7 @@ jobs:
             echo "✅ Updated version in all files to $new_version"
             echo "export RELEASE_VERSION=$new_version" >> $BASH_ENV
 
-            # Add Cargo.lock if it changed.
+            # Add Cargo.lock if modified.
             if ! git diff --quiet Cargo.lock; then
               echo "Cargo.lock has been modified. Adding to commit."
               git add Cargo.lock
@@ -242,11 +209,12 @@ jobs:
               gh pr create --title "$pr_title" --body "$pr_body" --base trunk --head "$branch"
             fi
 
-            # Clean the working directory to a pristine state.
+            # Clean workspace to ensure a pristine state.
             git reset --hard HEAD
             git clean -fdx
 
-            # Run packaging only once on the final (bumped) state.
+            # Build and package only after the version bump.
+            cargo build --release
             cargo make package -- --allow-dirty
       - run:
           name: Sign and Release Artifacts
@@ -275,10 +243,8 @@ workflows:
           requires: [ env_check, audit ]
       - build:
           requires: [ env_check, audit ]
-      - package:
-          requires: [ build, lint, test ]
       - release:
-          requires: [ package ]
+          requires: [ build, lint, test ]
           filters:
             branches:
               only: [ trunk ]
