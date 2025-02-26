@@ -22,15 +22,12 @@ jobs:
               fi
             done
             echo "✅ All required environment variables are set."
-
       - run:
           name: Test Version Bump Sed Patterns
           command: |
             set -euo pipefail
-            # Define a test new version for substitution
             test_new_version="0.2.6"
             
-            # Test for Cargo.toml
             sample_cargo='version = "0.2.5"'
             expected_cargo='version = "0.2.6"'
             result_cargo=$(echo "$sample_cargo" | sed "s/^version *= *\"[^\"]*\"/version = \"$test_new_version\"/")
@@ -39,7 +36,6 @@ jobs:
               exit 1
             fi
 
-            # Test for PKGBUILD
             sample_pkgbuild='pkgver=0.2.5'
             expected_pkgbuild='pkgver=0.2.6'
             result_pkgbuild=$(echo "$sample_pkgbuild" | sed "s/^pkgver=.*/pkgver=$test_new_version/")
@@ -48,7 +44,6 @@ jobs:
               exit 1
             fi
 
-            # Test for fin.sol
             sample_finsol='version: "0.2.5"'
             expected_finsol='version: "0.2.6"'
             result_finsol=$(echo "$sample_finsol" | sed "s/^version: *\"[^\"]*\"/version: \"$test_new_version\"/")
@@ -57,7 +52,6 @@ jobs:
               exit 1
             fi
 
-            # Test for flake.nix
             sample_flake='  version = "0.2.5";'
             expected_flake='  version = "0.2.6";'
             result_flake=$(echo "$sample_flake" | sed "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$test_new_version\";/")
@@ -66,7 +60,6 @@ jobs:
               exit 1
             fi
 
-            # Test for INSTALL.md
             sample_install='Version: 0.2.5'
             expected_install='Version: 0.2.6'
             result_install=$(echo "$sample_install" | sed "s/^Version: .*/Version: $test_new_version/")
@@ -178,7 +171,6 @@ jobs:
           paths:
             - target/
 
-
   release:
     executor: fin-deb-build
     steps:
@@ -224,6 +216,8 @@ jobs:
             sed -i "s/^version: *\".*\"/version: \"$new_version\"/" fin.sol
             sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
             sed -i "s/^Version: .*/Version: $new_version/" INSTALL.md
+            # Update CHANGELOG.md if an "Unreleased" header is present.
+            sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +'%Y-%m-%d')/" CHANGELOG.md || true
             echo "✅ Updated version in all files to $new_version"
             echo "export RELEASE_VERSION=$new_version" >> $BASH_ENV
             
@@ -232,8 +226,8 @@ jobs:
             git config user.name "CI Bot"
             branch="version-bump-$new_version"
             git checkout -b "$branch"
-            git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md
-            git commit -m "chore: bump version to $new_version"
+            git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md
+            git commit -m "chore: bump version to $new_version [skip ci]"
             git push --force origin "$branch"
             
             # Create a PR for the version bump.
@@ -241,8 +235,17 @@ jobs:
             pr_body="Automated version bump to $new_version."
             gh pr create --title "$pr_title" --body "$pr_body" --base trunk --head "$branch"
             
+            # Re-run packaging now that version files are updated.
+            cargo make package -- --allow-dirty
+
             # Authenticate with GitHub for release creation.
             echo "$GH_TOKEN" | gh auth login --with-token
+            
+            # Sign artifacts and generate checksums.
+            for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
+              gpg --detach-sign --armor "$file"
+              sha256sum "$file" > "$file.sha256"
+            done
             
             # Create GitHub release using the version (prefix with "v").
             gh release create "v$new_version" \
@@ -251,7 +254,6 @@ jobs:
               target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz \
               target/debian/fin_*_amd64.deb.asc target/fin-*-arch.tar.gz.asc target/fin-*-solus.tar.gz.asc target/fin-*-nix.tar.gz.asc \
               target/debian/fin_*_amd64.deb.sha256 target/fin-*-arch.tar.gz.sha256 target/fin-*-solus.tar.gz.sha256 target/fin-*-nix.tar.gz.sha256
-
 
 workflows:
   build_test_release:
