@@ -143,6 +143,8 @@ jobs:
     executor: fin-deb-build
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run:
           name: Configure GPG
           command: |
@@ -209,13 +211,15 @@ jobs:
               gh pr create --title "$pr_title" --body "$pr_body" --base trunk --head "$branch"
             fi
 
-            # Clean workspace to ensure a pristine state.
+            # Clean the working directory to a pristine state.
             git reset --hard HEAD
             git clean -fdx
+            # Force re-checkout of Cargo.lock to ensure it matches the commit.
+            git checkout HEAD Cargo.lock
 
-            # Build and package only after the version bump.
+            # Build and package the bumped version.
             cargo build --release
-            cargo make package -- --allow-dirty
+            cargo package --allow-dirty
       - run:
           name: Sign and Release Artifacts
           command: |
@@ -231,6 +235,7 @@ jobs:
               target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz \
               target/debian/fin_*_amd64.deb.asc target/fin-*-arch.tar.gz.asc target/fin-*-solus.tar.gz.asc target/fin-*-nix.tar.gz.asc \
               target/debian/fin_*_amd64.deb.sha256 target/fin-*-arch.tar.gz.sha256 target/fin-*-solus.tar.gz.sha256 target/fin-*-nix.tar.gz.sha256
+
 
 workflows:
   build_test_release:
