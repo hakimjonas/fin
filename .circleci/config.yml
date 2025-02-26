@@ -23,6 +23,11 @@ jobs:
             done
             echo "✅ All required environment variables are set."
       - run:
+          name: Authenticate GitHub CLI
+          command: |
+            echo "$GH_TOKEN" | gh auth login --with-token
+
+      - run:
           name: Test Version Bump Sed Patterns
           command: |
             set -euo pipefail
@@ -238,7 +243,7 @@ jobs:
             # Create a PR for the version bump.
             pr_title="chore: version bump to $new_version"
             pr_body="Automated version bump to $new_version."
-            gh pr create --title "$pr_title" --body "$pr_body" --base main --head "$branch"
+            gh pr create --title "$pr_title" --body "$pr_body" --base trunk --head "$branch"
             
             # Authenticate with GitHub for release creation.
             echo "$GH_TOKEN" | gh auth login --with-token
