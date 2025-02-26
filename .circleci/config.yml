@@ -253,7 +253,6 @@ jobs:
 
 
 workflows:
-  version: 2
   build_test_release:
     jobs:
       - env_check
@@ -270,6 +269,6 @@ workflows:
           requires: [ package ]
           filters:
             branches:
-              only: [ main ]
+              only: [ trunk ]
             tags:
               only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
