@@ -155,7 +155,6 @@ jobs:
           name: Build Packages for All Distributions
           command: |
             set -euo pipefail
-            # Run cargo-make package task with --allow-dirty to permit packaging with uncommitted changes.
             cargo make package -- --allow-dirty
       - run:
           name: Verify Packaged Artifacts
@@ -184,19 +183,17 @@ jobs:
             mkdir -p ~/.gnupg
             chmod 700 ~/.gnupg
             printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import
-            echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf  # Safer directive
+            echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
       - run:
           name: Release Actions
           command: |
             set -euo pipefail
             # Determine the version to use:
             if [ -n "${CIRCLE_TAG:-}" ]; then
-                # Use the tag version; strip a leading "v" if present.
                 tag_version="${CIRCLE_TAG#v}"
                 new_version="$tag_version"
                 echo "Tag detected: using provided version $new_version"
             else
-                # No tag: auto bump the version from Cargo.toml.
                 current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
                 if [[ ! "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
                   echo "❌ Invalid version format in Cargo.toml"
@@ -210,13 +207,12 @@ jobs:
                 echo "No tag detected: auto bump version from $current_version to $new_version"
             fi
             
-            # Update version in all files:
+            # Update version in all files.
             sed -i "s/^version *= *\".*\"/version = \"$new_version\"/" Cargo.toml
             sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD
             sed -i "s/^version: *\".*\"/version: \"$new_version\"/" fin.sol
             sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
             sed -i "s/^Version: .*/Version: $new_version/" INSTALL.md
-            # Update CHANGELOG.md if an "Unreleased" header is present.
             sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +'%Y-%m-%d')/" CHANGELOG.md || true
             echo "✅ Updated version in all files to $new_version"
             echo "export RELEASE_VERSION=$new_version" >> $BASH_ENV
@@ -235,9 +231,12 @@ jobs:
             pr_body="Automated version bump to $new_version."
             gh pr create --title "$pr_title" --body "$pr_body" --base trunk --head "$branch"
             
+            # Reset Cargo.lock to remove uncommitted changes.
+            git checkout -- Cargo.lock
+
             # Re-run packaging now that version files are updated.
             cargo make package -- --allow-dirty
-
+            
             # Authenticate with GitHub for release creation.
             echo "$GH_TOKEN" | gh auth login --with-token
             
