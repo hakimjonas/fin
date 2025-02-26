@@ -217,6 +217,12 @@ jobs:
             echo "✅ Updated version in all files to $new_version"
             echo "export RELEASE_VERSION=$new_version" >> $BASH_ENV
             
+            # Check if Cargo.lock has any changes
+            if ! git diff --quiet Cargo.lock; then
+            echo "Cargo.lock has been modified. Adding to commit."
+            git add Cargo.lock
+            fi
+            
             # Configure Git and commit the version bump on a new branch.
             git config user.email "ci-bot@example.com"
             git config user.name "CI Bot"
