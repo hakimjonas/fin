@@ -142,7 +142,7 @@ jobs:
   release:
     executor: fin-deb-build
     environment:
-      GH_TOKEN: ${GH_TOKEN}
+      GH_TOKEN: ${FINE}
     steps:
       - checkout
       - attach_workspace:
