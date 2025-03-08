@@ -155,87 +155,73 @@ jobs:
             echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
       - run:
           name: Release Actions
+          environment:
+            GH_TOKEN: <<your-circleci-github-token-env>>
           command: |
             set -euo pipefail
-            # Determine new version: use tag if provided; otherwise, auto bump.
+
+            # Ensure GH_TOKEN is set implicitly (no explicit login)
+            gh auth status
+
+            # Determine new version
             if [ -n "${CIRCLE_TAG:-}" ]; then
-              tag_version="${CIRCLE_TAG#v}"
-              new_version="$tag_version"
-              echo "Tag detected: using provided version $new_version"
+              new_version="${CIRCLE_TAG#v}"
+              echo "Tag detected: releasing version $new_version"
             else
               current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
               if [[ ! "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
-                echo "❌ Invalid version format in Cargo.toml"
+                echo "❌ Invalid version format: $current_version"
                 exit 1
               fi
-              major=${BASH_REMATCH[1]}
-              minor=${BASH_REMATCH[2]}
-              patch=${BASH_REMATCH[3]}
+              major="${BASH_REMATCH[1]}"
+              minor="${BASH_REMATCH[2]}"
+              patch="${BASH_REMATCH[3]}"
+              suffix="${BASH_REMATCH[4]:-}"
               new_patch=$((patch + 1))
               new_version="${major}.${minor}.${new_patch}${BASH_REMATCH[4]:-}"
-              echo "No tag detected: auto bump version from $current_version to $new_version"
+              echo "Bumping version: $current_version → $new_version"
             fi
 
             # Update version in files.
             sed -i "s/^version *= *\".*\"/version = \"$new_version\"/" Cargo.toml
             sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD
-            sed -i "s/^version: *\".*\"/version: \"$new_version\"/" fin.sol
+            sed -i "s/^version: *\"[^\"]*\"/version: \"$new_version\"/" fin.sol
             sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
             sed -i "s/^Version: .*/Version: $new_version/" INSTALL.md
-            sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +'%Y-%m-%d')/" CHANGELOG.md || true
-            echo "✅ Updated version in all files to $new_version"
-            echo "export RELEASE_VERSION=$new_version" >> $BASH_ENV
+            sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md
 
-            # Add Cargo.lock if modified.
-            if ! git diff --quiet Cargo.lock; then
-              echo "Cargo.lock has been modified. Adding to commit."
-              git add Cargo.lock
-            fi
-
-            # Commit the version bump.
+            # Git configuration
             git config user.email "ci-bot@example.com"
             git config user.name "CI Bot"
             branch="version-bump-$new_version"
             git checkout -b "$branch"
-            git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md
-            git commit -m "chore: bump version to $new_version [skip ci]"
-            git push --force origin "$branch"
+            git add Cargo.toml PKGBUILD flake.nix INSTALL.md CHANGELOG.md
 
-            # Check if a bump PR already exists.
-            existing_pr=$(gh pr list --head "version-bump-$new_version" --json number --jq '.[0].number')
-            if [ -n "$existing_pr" ]; then
-              echo "A bump PR for version $new_version already exists (PR #$existing_pr). Skipping PR creation."
+            if git diff --cached --quiet; then
+              echo "No changes to commit"
             else
-              pr_title="chore: version bump to $new_version"
-              pr_body="Automated version bump to $new_version."
-              gh pr create --title "$pr_title" --body "$pr_body" --base trunk --head "$branch"
+              git commit -m "Bump version to $new_version [skip ci]"
+              git push origin "$branch"
+              gh pr create --fill --base trunk --head "$branch"
             fi
 
-            # Clean the working directory to a pristine state.
-            git reset --hard HEAD
-            git clean -fdx
-            # Force re-checkout of Cargo.lock to ensure it matches the commit.
-            git checkout HEAD Cargo.lock
-
-            # Build and package the bumped version.
+            # Build and package
             cargo build --release
             cargo package --allow-dirty
-      - run:
-          name: Sign and Release Artifacts
-          command: |
-            set -euo pipefail
-            echo "$GH_TOKEN" | gh auth login --with-token
+
+            # Signing and checksum
             for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
               gpg --detach-sign --armor "$file"
               sha256sum "$file" > "$file.sha256"
             done
+
+            # Create release on GitHub
             gh release create "v$new_version" \
               --title "Release v$new_version" \
-              --notes-file CHANGELOG.md \
+              --notes "Release $new_version" \
               target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz \
               target/debian/fin_*_amd64.deb.asc target/fin-*-arch.tar.gz.asc target/fin-*-solus.tar.gz.asc target/fin-*-nix.tar.gz.asc \
               target/debian/fin_*_amd64.deb.sha256 target/fin-*-arch.tar.gz.sha256 target/fin-*-solus.tar.gz.sha256 target/fin-*-nix.tar.gz.sha256
-
 
 workflows:
   build_test_release:
