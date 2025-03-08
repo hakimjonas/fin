@@ -148,6 +148,17 @@ jobs:
       - attach_workspace:
           at: .
       - run:
+          name: Verify Required Environment Variables
+          command: |
+            set -euo pipefail
+            for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_SHA1; do
+              if [ -z "${!var:-}" ]; then
+                echo "❌ $var is not set!"
+                exit 1
+              fi
+            done
+            echo "✅ All required environment variables are set."
+      - run:
           name: Configure GPG
           command: |
             set -euo pipefail
@@ -160,6 +171,7 @@ jobs:
           command: |
             set -euo pipefail
 
+            echo $GH_TOKEN | gh auth login --with-token
             gh auth status
 
             # Determine new version
@@ -217,6 +229,7 @@ jobs:
               target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz \
               target/debian/fin_*_amd64.deb.asc target/fin-*-arch.tar.gz.asc target/fin-*-solus.tar.gz.asc target/fin-*-nix.tar.gz.asc \
               target/debian/fin_*_amd64.deb.sha256 target/fin-*-arch.tar.gz.sha256 target/fin-*-solus.tar.gz.sha256 target/fin-*-nix.tar.gz.sha256
+
 
 workflows:
   build_test_release:
