@@ -157,6 +157,12 @@ jobs:
             done
             echo "✅ All required environment variables are set."
       - run:
+          name: Debug Environment Variables
+          command: |
+            set -euo pipefail
+            echo "GH_TOKEN is set to: ${GH_TOKEN:-not set}"
+            env | grep GH_TOKEN
+      - run:
           name: Configure GPG
           command: |
             set -euo pipefail
@@ -165,13 +171,23 @@ jobs:
             printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import
             echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
       - run:
+          name: Install GitHub CLI
+          command: |
+            set -euo pipefail
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            apt-get update
+            apt-get install -y gh
+      - run:
           name: Authenticate with GitHub CLI
           command: |
             set -euo pipefail
-            # Clear the GH_TOKEN environment variable
-            unset GH_TOKEN
-            # Authenticate using the token
             echo "$GH_TOKEN" | gh auth login --with-token
+            gh auth status
+      - run:
+          name: Verify GitHub CLI Authentication
+          command: |
+            set -euo pipefail
             gh auth status
       - run:
           name: Release Actions
