@@ -184,6 +184,9 @@ jobs:
             set -euo pipefail
             echo "$GH_TOKEN" | gh auth login --with-token
             gh auth status
+            # Unset GH_TOKEN so that gh uses stored credentials for subsequent commands.
+            unset GH_TOKEN
+
       - run:
           name: Verify GitHub CLI Authentication
           command: |
