@@ -182,18 +182,14 @@ jobs:
           name: Authenticate and Release Actions
           command: |
             set -euo pipefail
-            # Authenticate using GH_TOKEN, then unset it so stored credentials are used.
-            echo "$GH_TOKEN" | gh auth login --with-token
-            gh auth status
+            # Save the token locally and then unset GH_TOKEN so it doesn't interfere.
+            token="$GH_TOKEN"
             unset GH_TOKEN
-            # Verify that GH_TOKEN is unset.
-            if env | grep -q '^GH_TOKEN='; then
-              echo "GH_TOKEN still present!"
-              exit 1
-            fi
+            # Authenticate using the saved token.
+            echo "$token" | gh auth login --with-token
             gh auth status
 
-            # Determine new version
+            # Determine new version.
             if [ -n "${CIRCLE_TAG:-}" ]; then
               new_version="${CIRCLE_TAG#v}"
               echo "Tag detected: releasing version $new_version"
