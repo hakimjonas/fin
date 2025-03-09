@@ -179,23 +179,19 @@ jobs:
             apt-get update
             apt-get install -y gh
       - run:
-          name: Authenticate with GitHub CLI
+          name: Authenticate and Release Actions
           command: |
             set -euo pipefail
+            # Authenticate using GH_TOKEN, then unset it so stored credentials are used.
             echo "$GH_TOKEN" | gh auth login --with-token
             gh auth status
-            # Unset GH_TOKEN so that gh uses stored credentials for subsequent commands.
             unset GH_TOKEN
-
-      - run:
-          name: Verify GitHub CLI Authentication
-          command: |
-            set -euo pipefail
+            # Verify that GH_TOKEN is unset.
+            if env | grep -q '^GH_TOKEN='; then
+              echo "GH_TOKEN still present!"
+              exit 1
+            fi
             gh auth status
-      - run:
-          name: Release Actions
-          command: |
-            set -euo pipefail
 
             # Determine new version
             if [ -n "${CIRCLE_TAG:-}" ]; then
@@ -252,7 +248,6 @@ jobs:
               target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz \
               target/debian/fin_*_amd64.deb.asc target/fin-*-arch.tar.gz.asc target/fin-*-solus.tar.gz.asc target/fin-*-nix.tar.gz.asc \
               target/debian/fin_*_amd64.deb.sha256 target/fin-*-arch.tar.gz.sha256 target/fin-*-solus.tar.gz.sha256 target/fin-*-nix.tar.gz.sha256
-
 
 workflows:
   build_test_release:
