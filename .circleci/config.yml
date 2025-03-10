@@ -211,16 +211,19 @@ jobs:
             # Update version in files.
             sed -i "s/^version *= *\".*\"/version = \"$new_version\"/" Cargo.toml
             sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD
-            sed -i "s/^version: *\"[^\"]*\"/version: \"$new_version\"/" fin.sol
+            # For fin.sol, capture group around the version value ensures replacement.
+            sed -i 's/^\(version:\s*"\)[^"]*\(".*\)$/\1'"$new_version"'\2/' fin.sol
+            # For flake.nix, assume the pattern remains the same.
             sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
-            sed -i "s/^Version: .*/Version: $new_version/" INSTALL.md
+            # Update INSTALL.md using a capture group.
+            sed -i 's/^\(Version:\s*\).*/\1'"$new_version"'/' INSTALL.md
             sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md || true
 
             git config user.email "ci-bot@example.com"
             git config user.name "CI Bot"
             branch="version-bump-$new_version"
             git checkout -b "$branch"
-            git add Cargo.toml PKGBUILD flake.nix INSTALL.md CHANGELOG.md
+            git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md
 
             if git diff --cached --quiet; then
               echo "No changes to commit"
@@ -233,9 +236,14 @@ jobs:
             cargo build --release
             cargo package --allow-dirty
 
+            # Sign files if they exist.
             for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
-              gpg --detach-sign --armor "$file"
-              sha256sum "$file" > "$file.sha256"
+              if [ -f "$file" ]; then
+                gpg --detach-sign --armor "$file"
+                sha256sum "$file" > "$file.sha256"
+              else
+                echo "File $file does not exist, skipping signing."
+              fi
             done
 
             gh release create "v$new_version" \
@@ -244,6 +252,7 @@ jobs:
               target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz \
               target/debian/fin_*_amd64.deb.asc target/fin-*-arch.tar.gz.asc target/fin-*-solus.tar.gz.asc target/fin-*-nix.tar.gz.asc \
               target/debian/fin_*_amd64.deb.sha256 target/fin-*-arch.tar.gz.sha256 target/fin-*-solus.tar.gz.sha256 target/fin-*-nix.tar.gz.sha256
+
 
 workflows:
   build_test_release:
