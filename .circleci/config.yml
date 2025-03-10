@@ -228,7 +228,7 @@ jobs:
             if git diff --cached --quiet; then
               echo "No changes to commit"
             else
-              git commit -m "Bump version to $new_version [skip ci]"
+              git commit -m "Bump version to $new_version [skip ci]"git commit -m "Bump version to $new_version"
               git push origin "$branch"
               gh pr create --fill --base trunk --head "$branch"
             fi
