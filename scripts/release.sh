@@ -3,8 +3,9 @@ set -euo pipefail
 
 echo "=== Starting Release Process ==="
 
-# 0. Ensure we run only on trunk to avoid infinite bumps.
+# 0. Ensure we run only on trunk (strip any "heads/" prefix)
 current_branch=$(git rev-parse --abbrev-ref HEAD)
+current_branch=${current_branch#heads/}
 if [ "$current_branch" != "trunk" ]; then
   echo "Current branch ($current_branch) is not trunk. Skipping release."
   exit 0
@@ -33,13 +34,13 @@ echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
 current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
 echo "Current version: $current_version"
 
-# 5. Guard: if a release for current_version already exists, exit.
+# 5. Guard: if a release for current_version already exists, abort.
 if gh release view "v$current_version" >/dev/null 2>&1; then
   echo "Version $current_version is already released. Aborting bump."
   exit 0
 fi
 
-# 6. Calculate new version (bump patch).
+# 6. Calculate new version by bumping the patch number.
 if [[ "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
   major="${BASH_REMATCH[1]}"
   minor="${BASH_REMATCH[2]}"
@@ -56,12 +57,12 @@ fi
 # 7. Update version in files.
 sed -i "s/^version *= *\".*\"/version = \"$new_version\"/" Cargo.toml
 sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD
-# For fin.sol, update the XML <Version> tag.
+# Update fin.sol: replace the XML <Version> tag.
 sed -i "s|<Version>[^<]*</Version>|<Version>$new_version</Version>|" fin.sol
 sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
 # Replace all occurrences of the old version in INSTALL.md.
 sed -i "s/$current_version/$new_version/g" INSTALL.md
-# Update CHANGELOG.md: if "Unreleased" exists, update; else, prepend header.
+# Update CHANGELOG.md: update "Unreleased" header or prepend new header.
 if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
   sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md
 else
@@ -69,7 +70,7 @@ else
   echo "Appended new changelog header."
 fi
 
-# 8. Verify critical file updates.
+# 8. Verify updates in critical files.
 if ! grep -q "<Version>$new_version</Version>" fin.sol; then
   echo "❌ fin.sol did not update to version $new_version"
   exit 1
@@ -96,7 +97,6 @@ fi
 
 # 10. Build and package.
 cargo build --release
-# Use --allow-dirty to include uncommitted changes (like Cargo.lock) if needed.
 cargo package --allow-dirty
 
 # 11. Build distro-specific packages via cargo-make.
@@ -152,8 +152,7 @@ else
   fi
 fi
 
-# 16. Auto-merge the bump PR.
-# Specifically look up the PR with head matching the bump branch.
+# 16. Auto-merge the bump PR (look up the PR by head branch).
 pr_number=$(gh pr list --head "$bump_branch" --json number --jq ".[0].number")
 if [ -n "$pr_number" ]; then
   echo "Auto-merging bump PR #$pr_number"
