@@ -64,6 +64,24 @@ jobs:
             fi
             echo "✅ All version bump sed patterns passed."
 
+  verify_files:
+    executor: fin-deb-build
+    steps:
+      - checkout
+      - run:
+          name: Verify Required Files Exist
+          command: |
+            set -euo pipefail
+            required_files=(Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md)
+            for file in "${required_files[@]}"; do
+              if [ ! -f "$file" ]; then
+                echo "❌ Required file '$file' does not exist!"
+                exit 1
+              else
+                echo "✅ File '$file' exists."
+              fi
+            done
+
   lint:
     executor: fin-deb-build
     steps:
@@ -211,12 +229,12 @@ jobs:
             # Update version in files.
             sed -i "s/^version *= *\".*\"/version = \"$new_version\"/" Cargo.toml
             sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD
-            # For fin.sol, capture group around the version value ensures replacement.
-            sed -i 's/^\(version:\s*"\)[^"]*\(".*\)$/\1'"$new_version"'\2/' fin.sol
-            # For flake.nix, assume the pattern remains the same.
+            # For fin.sol, try a more flexible pattern: either with or without quotes.
+            sed -i 's/\(version:\s*"\)[^"]*/\1'"$new_version"'/' fin.sol || sed -i 's/\(version:\s*\)[0-9]\+\.[0-9]\+\.[0-9]\+/\1'"$new_version"'/' fin.sol
+            # For flake.nix.
             sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
-            # Update INSTALL.md using a capture group.
-            sed -i 's/^\(Version:\s*\).*/\1'"$new_version"'/' INSTALL.md
+            # For INSTALL.md, update lines starting with "Version:".
+            sed -i 's/\(Version:\s*\)[0-9]\+\.[0-9]\+\.[0-9]\+/\1'"$new_version"'/' INSTALL.md
             sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md || true
 
             git config user.email "ci-bot@example.com"
@@ -237,6 +255,7 @@ jobs:
             cargo package --allow-dirty
 
             # Sign files if they exist.
+            shopt -s nullglob
             for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
               if [ -f "$file" ]; then
                 gpg --detach-sign --armor "$file"
@@ -246,24 +265,43 @@ jobs:
               fi
             done
 
-            gh release create "v$new_version" \
-              --title "Release v$new_version" \
-              --notes "Release $new_version" \
-              target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz \
-              target/debian/fin_*_amd64.deb.asc target/fin-*-arch.tar.gz.asc target/fin-*-solus.tar.gz.asc target/fin-*-nix.tar.gz.asc \
-              target/debian/fin_*_amd64.deb.sha256 target/fin-*-arch.tar.gz.sha256 target/fin-*-solus.tar.gz.sha256 target/fin-*-nix.tar.gz.sha256
+            # Gather asset files that exist.
+            assets=()
+            for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
+              if [ -f "$file" ]; then
+                assets+=("$file")
+              fi
+            done
+            for file in target/debian/fin_*_amd64.deb.asc target/fin-*-arch.tar.gz.asc target/fin-*-solus.tar.gz.asc target/fin-*-nix.tar.gz.asc; do
+              if [ -f "$file" ]; then
+                assets+=("$file")
+              fi
+            done
+            for file in target/debian/fin_*_amd64.deb.sha256 target/fin-*-arch.tar.gz.sha256 target/fin-*-solus.tar.gz.sha256 target/fin-*-nix.tar.gz.sha256; do
+              if [ -f "$file" ]; then
+                assets+=("$file")
+              fi
+            done
+
+            if [ ${#assets[@]} -eq 0 ]; then
+              echo "No release assets found, creating release without assets."
+              gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version"
+            else
+              gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version" "${assets[@]}"
+            fi
 
 workflows:
   build_test_release:
     jobs:
       - env_check
+      - verify_files
       - audit
       - lint:
-          requires: [ env_check, audit ]
+          requires: [ env_check, verify_files, audit ]
       - test:
-          requires: [ env_check, audit ]
+          requires: [ env_check, verify_files, audit ]
       - build:
-          requires: [ env_check, audit ]
+          requires: [ env_check, verify_files, audit ]
       - release:
           requires: [ build, lint, test ]
           filters:
