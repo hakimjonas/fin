@@ -13,7 +13,7 @@ if [ -z "${CIRCLE_TAG:-}" ] && [ "$current_branch" != "trunk" ]; then
 fi
 
 # 1. Verify required environment variables.
-for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_SHA1; do
+for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_SHA1; do
   if [ -z "${!var:-}" ]; then
     echo "❌ $var is not set!"
     exit 1
@@ -26,14 +26,14 @@ token="$GH_TOKEN"
 unset GH_TOKEN
 
 # 3. Authenticate with GitHub CLI.
-echo "$token" | gh auth login --with-token
-gh auth status
+echo "$token" | gh auth login --with-token || exit 1
+gh auth status || exit 1
 
 # 4. Configure GPG.
-mkdir -p ~/.gnupg
-chmod 700 ~/.gnupg
-printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import
-echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+mkdir -p ~/.gnupg || exit 1
+chmod 700 ~/.gnupg || exit 1
+printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import || exit 1
+echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf || exit 1
 
 # 5. Determine new version.
 if [ -n "${CIRCLE_TAG:-}" ]; then
@@ -65,18 +65,18 @@ else
 fi
 
 # 6. Update version in files.
-sed -i "s/^version *= *\".*\"/version = \"$new_version\"/" Cargo.toml
-sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD
+sed -i "s/^version *= *\".*\"/version = \"$new_version\"/" Cargo.toml || exit 1
+sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD || exit 1
 # Update fin.sol: replace the XML <Version> tag.
-sed -i "s|<Version>[^<]*</Version>|<Version>$new_version</Version>|" fin.sol
-sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
+sed -i "s|<Version>[^<]*</Version>|<Version>$new_version</Version>|" fin.sol || exit 1
+sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix || exit 1
 # Replace occurrences in INSTALL.md.
-sed -i "s/$current_version/$new_version/g" INSTALL.md
+sed -i "s/$current_version/$new_version/g" INSTALL.md || exit 1
 # Update CHANGELOG.md: update "Unreleased" header or prepend header.
 if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
-  sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md
+  sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md || exit 1
 else
-  echo -e "## [$new_version] - $(date +%Y-%m-%d)\n\n$(cat CHANGELOG.md)" > CHANGELOG.md
+  echo -e "## [$new_version] - $(date +%Y-%m-%d)\n\n$(cat CHANGELOG.md)" > CHANGELOG.md || exit 1
   echo "Appended new changelog header."
 fi
 
@@ -95,35 +95,35 @@ if [ -z "${CIRCLE_TAG:-}" ]; then
   git config user.email "ci-bot@example.com"
   git config user.name "CI Bot"
   bump_branch="version-bump-$new_version"
-  git checkout -b "$bump_branch"
-  git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md
+  git checkout -b "$bump_branch" || exit 1
+  git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md || exit 1
   if git diff --cached --quiet; then
     echo "No changes to commit"
   else
-    git commit -m "Bump version to $new_version"
-    git push origin "$bump_branch"
-    pr_url=$(gh pr create --fill --base trunk --head "$bump_branch")
+    git commit -m "Bump version to $new_version" || exit 1
+    git push origin "$bump_branch" || exit 1
+    pr_url=$(gh pr create --fill --base trunk --head "$bump_branch") || exit 1
     echo "Created bump PR: $pr_url"
   fi
 fi
 
 # 9. Build and package.
-cargo build --release
-cargo package --allow-dirty
+cargo build --release || exit 1
+cargo package --allow-dirty || exit 1
 
 # 10. Export VERSION for cargo-make tasks.
 export VERSION="$new_version"
 
 # 11. Build distro-specific packages via cargo-make.
 echo "Packaging distro-specific files..."
-cargo make package
+cargo make package || exit 1
 
 # 12. Sign release assets.
 shopt -s nullglob
 for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
   if [ -f "$file" ]; then
-    gpg --detach-sign --armor "$file"
-    sha256sum "$file" > "$file.sha256"
+    gpg --detach-sign --armor "$file" || exit 1
+    sha256sum "$file" > "$file.sha256" || exit 1
   else
     echo "File $file does not exist, skipping signing."
   fi
@@ -147,23 +147,23 @@ fi
 # 14. Handle tag: push existing or create new.
 if git rev-parse "v$new_version" >/dev/null 2>&1; then
   echo "Tag v$new_version exists locally, pushing tag."
-  git push origin "v$new_version"
+  git push origin "v$new_version" || exit 1
 else
   echo "Creating new tag v$new_version."
-  git tag "v$new_version"
-  git push origin "v$new_version"
+  git tag "v$new_version" || exit 1
+  git push origin "v$new_version" || exit 1
 fi
 
 # 15. Create or update GitHub release.
 if gh release view "v$new_version" >/dev/null 2>&1; then
   echo "Release v$new_version already exists; updating release."
-  gh release edit "v$new_version" --title "Release v$new_version" --notes "Release $new_version"
+  gh release edit "v$new_version" --title "Release v$new_version" --notes "Release $new_version" || exit 1
 else
   if [ ${#assets[@]} -eq 0 ]; then
     echo "No release assets found, creating release without assets."
-    gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version"
+    gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version" || exit 1
   else
-    gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version" "${assets[@]}"
+    gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version" "${assets[@]}" || exit 1
   fi
 fi
 
@@ -172,7 +172,7 @@ if [ -z "${CIRCLE_TAG:-}" ]; then
   pr_number=$(gh pr list --head "$bump_branch" --json number --jq ".[0].number")
   if [ -n "$pr_number" ]; then
     echo "Auto-merging bump PR #$pr_number"
-    gh pr merge "$pr_number" --squash --delete-branch --auto
+    gh pr merge "$pr_number" --squash --delete-branch --auto || exit 1
   else
     echo "No bump PR found to merge."
   fi
