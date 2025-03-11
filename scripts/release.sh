@@ -40,15 +40,17 @@ if [ -n "${CIRCLE_TAG:-}" ]; then
   # Tag Mode: use the tag provided.
   new_version="${CIRCLE_TAG#v}"
   echo "Tag detected: releasing version $new_version"
-else
-  # Bump Mode: read current version from Cargo.toml.
-  current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
-  echo "Current version: $current_version"
-  # Guard: if release for current_version already exists, abort bump.
-  if gh release view "v$current_version" >/dev/null 2>&1; then
-    echo "Version $current_version is already released. Aborting bump."
+
+  # Guard: if release for current_version already exists, abort.
+  if gh release view "v$new_version" >/dev/null 2>&1; then
+    echo "Version $new_version is already released. Aborting."
     exit 0
   fi
+else
+  # Bump Mode: always create a new version bump PR.
+  current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
+  echo "Current version: $current_version"
+
   # Calculate new version by bumping patch.
   if [[ "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
     major="${BASH_REMATCH[1]}"
