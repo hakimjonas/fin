@@ -3,7 +3,7 @@ set -euo pipefail
 
 echo "=== Starting Release Process ==="
 
-# Guard: Only run on trunk.
+# 0. Ensure we run only on trunk to avoid infinite bumps.
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 if [ "$current_branch" != "trunk" ]; then
   echo "Current branch ($current_branch) is not trunk. Skipping release."
@@ -11,7 +11,7 @@ if [ "$current_branch" != "trunk" ]; then
 fi
 
 # 1. Verify required environment variables.
-for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_SHA1; do
+for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_SHA1; do
   if [ -z "${!var:-}" ]; then
     echo "❌ $var is not set!"
     exit 1
@@ -33,13 +33,13 @@ echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
 current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
 echo "Current version: $current_version"
 
-# 5. Guard: if a release for current_version already exists, abort.
+# 5. Guard: if a release for current_version already exists, exit.
 if gh release view "v$current_version" >/dev/null 2>&1; then
   echo "Version $current_version is already released. Aborting bump."
   exit 0
 fi
 
-# 6. Calculate new version by bumping patch.
+# 6. Calculate new version (bump patch).
 if [[ "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
   major="${BASH_REMATCH[1]}"
   minor="${BASH_REMATCH[2]}"
@@ -53,18 +53,15 @@ else
   exit 1
 fi
 
-# 7. Capture the old version.
-old_version="$current_version"
-
-# 8. Update version in files.
+# 7. Update version in files.
 sed -i "s/^version *= *\".*\"/version = \"$new_version\"/" Cargo.toml
 sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD
-# Update fin.sol by replacing the XML <Version> tag.
+# For fin.sol, update the XML <Version> tag.
 sed -i "s|<Version>[^<]*</Version>|<Version>$new_version</Version>|" fin.sol
 sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
 # Replace all occurrences of the old version in INSTALL.md.
-sed -i "s/$old_version/$new_version/g" INSTALL.md
-# Update CHANGELOG.md: if an "Unreleased" header exists, update it; otherwise, prepend one.
+sed -i "s/$current_version/$new_version/g" INSTALL.md
+# Update CHANGELOG.md: if "Unreleased" exists, update; else, prepend header.
 if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
   sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md
 else
@@ -72,7 +69,7 @@ else
   echo "Appended new changelog header."
 fi
 
-# 9. Verify that critical files were updated.
+# 8. Verify critical file updates.
 if ! grep -q "<Version>$new_version</Version>" fin.sol; then
   echo "❌ fin.sol did not update to version $new_version"
   exit 1
@@ -82,7 +79,7 @@ if ! grep -q "$new_version" INSTALL.md; then
   exit 1
 fi
 
-# 10. Commit changes to a new bump branch.
+# 9. Commit changes on a new bump branch.
 git config user.email "ci-bot@example.com"
 git config user.name "CI Bot"
 bump_branch="version-bump-$new_version"
@@ -97,18 +94,16 @@ else
   echo "Created bump PR: $pr_url"
 fi
 
-# 11. Build and package.
+# 10. Build and package.
 cargo build --release
+# Use --allow-dirty to include uncommitted changes (like Cargo.lock) if needed.
 cargo package --allow-dirty
 
-# 12. Export VERSION for cargo-make tasks.
-export VERSION="$new_version"
-
-# 13. Build distro-specific packages via cargo-make.
+# 11. Build distro-specific packages via cargo-make.
 echo "Packaging distro-specific files..."
 cargo make package
 
-# 14. Sign release assets.
+# 12. Sign release assets.
 shopt -s nullglob
 for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
   if [ -f "$file" ]; then
@@ -119,7 +114,7 @@ for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-
   fi
 done
 
-# 15. Gather asset files.
+# 13. Gather asset files.
 assets=()
 for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
   if [ -f "$file" ]; then
@@ -134,7 +129,7 @@ if [ ${#assets[@]} -eq 0 ]; then
   done
 fi
 
-# 16. Handle tag: if it exists, push it; otherwise, create and push.
+# 14. Handle tag: push existing or create new.
 if git rev-parse "v$new_version" >/dev/null 2>&1; then
   echo "Tag v$new_version exists locally, pushing tag."
   git push origin "v$new_version"
@@ -144,7 +139,7 @@ else
   git push origin "v$new_version"
 fi
 
-# 17. Create or update GitHub release.
+# 15. Create or update GitHub release.
 if gh release view "v$new_version" >/dev/null 2>&1; then
   echo "Release v$new_version already exists; updating release."
   gh release edit "v$new_version" --title "Release v$new_version" --notes "Release $new_version"
@@ -157,8 +152,9 @@ else
   fi
 fi
 
-# 18. Auto-merge the bump PR.
-pr_number=$(gh pr view --json number --jq ".number")
+# 16. Auto-merge the bump PR.
+# Specifically look up the PR with head matching the bump branch.
+pr_number=$(gh pr list --head "$bump_branch" --json number --jq ".[0].number")
 if [ -n "$pr_number" ]; then
   echo "Auto-merging bump PR #$pr_number"
   gh pr merge "$pr_number" --squash --delete-branch --auto
