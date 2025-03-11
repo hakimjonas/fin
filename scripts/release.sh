@@ -20,27 +20,31 @@ for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_SHA1
 done
 echo "✅ All required environment variables are set."
 
-# 2. Authenticate with GitHub CLI.
-echo "$GH_TOKEN" | gh auth login --with-token
+# 2. Store and then unset GH_TOKEN so that GitHub CLI reads from STDIN.
+token="$GH_TOKEN"
+unset GH_TOKEN
+
+# 3. Authenticate with GitHub CLI.
+echo "$token" | gh auth login --with-token
 gh auth status
 
-# 3. Configure GPG.
+# 4. Configure GPG.
 mkdir -p ~/.gnupg
 chmod 700 ~/.gnupg
 printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import
 echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
 
-# 4. Read current version from Cargo.toml.
+# 5. Read current version from Cargo.toml.
 current_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
 echo "Current version: $current_version"
 
-# 5. Guard: if a release for current_version already exists, abort.
+# 6. Guard: if a release for current_version already exists, abort.
 if gh release view "v$current_version" >/dev/null 2>&1; then
   echo "Version $current_version is already released. Aborting bump."
   exit 0
 fi
 
-# 6. Calculate new version by bumping the patch number.
+# 7. Calculate new version by bumping patch.
 if [[ "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
   major="${BASH_REMATCH[1]}"
   minor="${BASH_REMATCH[2]}"
@@ -54,7 +58,7 @@ else
   exit 1
 fi
 
-# 7. Update version in files.
+# 8. Update version in files.
 sed -i "s/^version *= *\".*\"/version = \"$new_version\"/" Cargo.toml
 sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD
 # Update fin.sol: replace the XML <Version> tag.
@@ -62,7 +66,7 @@ sed -i "s|<Version>[^<]*</Version>|<Version>$new_version</Version>|" fin.sol
 sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
 # Replace all occurrences of the old version in INSTALL.md.
 sed -i "s/$current_version/$new_version/g" INSTALL.md
-# Update CHANGELOG.md: update "Unreleased" header or prepend new header.
+# Update CHANGELOG.md: if "Unreleased" exists, update; else, prepend header.
 if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
   sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md
 else
@@ -70,7 +74,7 @@ else
   echo "Appended new changelog header."
 fi
 
-# 8. Verify updates in critical files.
+# 9. Verify updates in critical files.
 if ! grep -q "<Version>$new_version</Version>" fin.sol; then
   echo "❌ fin.sol did not update to version $new_version"
   exit 1
@@ -80,7 +84,7 @@ if ! grep -q "$new_version" INSTALL.md; then
   exit 1
 fi
 
-# 9. Commit changes on a new bump branch.
+# 10. Commit changes on a new bump branch.
 git config user.email "ci-bot@example.com"
 git config user.name "CI Bot"
 bump_branch="version-bump-$new_version"
@@ -95,15 +99,15 @@ else
   echo "Created bump PR: $pr_url"
 fi
 
-# 10. Build and package.
+# 11. Build and package.
 cargo build --release
 cargo package --allow-dirty
 
-# 11. Build distro-specific packages via cargo-make.
+# 12. Build distro-specific packages via cargo-make.
 echo "Packaging distro-specific files..."
 cargo make package
 
-# 12. Sign release assets.
+# 13. Sign release assets.
 shopt -s nullglob
 for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
   if [ -f "$file" ]; then
@@ -114,7 +118,7 @@ for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-
   fi
 done
 
-# 13. Gather asset files.
+# 14. Gather asset files.
 assets=()
 for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
   if [ -f "$file" ]; then
@@ -129,7 +133,7 @@ if [ ${#assets[@]} -eq 0 ]; then
   done
 fi
 
-# 14. Handle tag: push existing or create new.
+# 15. Handle tag: push existing or create new.
 if git rev-parse "v$new_version" >/dev/null 2>&1; then
   echo "Tag v$new_version exists locally, pushing tag."
   git push origin "v$new_version"
@@ -139,7 +143,7 @@ else
   git push origin "v$new_version"
 fi
 
-# 15. Create or update GitHub release.
+# 16. Create or update GitHub release.
 if gh release view "v$new_version" >/dev/null 2>&1; then
   echo "Release v$new_version already exists; updating release."
   gh release edit "v$new_version" --title "Release v$new_version" --notes "Release $new_version"
@@ -152,7 +156,7 @@ else
   fi
 fi
 
-# 16. Auto-merge the bump PR (look up the PR by head branch).
+# 17. Auto-merge the bump PR (lookup PR by head branch).
 pr_number=$(gh pr list --head "$bump_branch" --json number --jq ".[0].number")
 if [ -n "$pr_number" ]; then
   echo "Auto-merging bump PR #$pr_number"
