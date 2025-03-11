@@ -157,16 +157,15 @@ jobs:
           name: Run Cargo Audit
           command: cargo audit
 
-  release:
-    executor: fin-deb-build
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - run:
-          name: Run Release Script
-          command: ./scripts/release.sh
-
+release:
+  executor: fin-deb-build
+  steps:
+    - checkout
+    - attach_workspace:
+        at: .
+    - run:
+        name: Run Release Script
+        command: ./scripts/release.sh
 
 workflows:
   build_test_release:
