@@ -6,28 +6,9 @@ executors:
       - image: hakimjonas/fin-deb-build
     working_directory: /workspace
 
-# Reusable cache steps
-_restore_cache: &restore_cache
-  restore_cache:
-    keys:
-      - cargo-{{ checksum "Cargo.lock" }}
-
-_save_cache: &save_cache
-  save_cache:
-    paths:
-      - target
-      - ~/.cargo/registry
-      - ~/.cargo/git
-    key: cargo-{{ checksum "Cargo.lock" }}
-
 jobs:
   env_check:
     executor: fin-deb-build
-    environment:
-      GH_TOKEN: << pipeline.parameters.GH_TOKEN >>
-      FINE_SIGNATURE_KEY_B64: << pipeline.parameters.FINE_SIGNATURE_KEY_B64 >>
-      FINE_SIGNATURE_PASSPHRASE: << pipeline.parameters.FINE_SIGNATURE_PASSPHRASE >>
-      CIRCLE_SHA1: << pipeline.parameters.CIRCLE_SHA1 >>
     steps:
       - checkout
       - run:
@@ -46,7 +27,6 @@ jobs:
           command: |
             set -euo pipefail
             test_new_version="0.2.6"
-            # Test Cargo.toml version bump
             sample_cargo='version = "0.2.5"'
             expected_cargo='version = "0.2.6"'
             result_cargo=$(echo "$sample_cargo" | sed "s/^version *= *\"[^\"]*\"/version = \"$test_new_version\"/")
@@ -54,7 +34,6 @@ jobs:
               echo "Cargo.toml sed pattern failed: got '$result_cargo', expected '$expected_cargo'"
               exit 1
             fi
-            # Test PKGBUILD version bump
             sample_pkgbuild='pkgver=0.2.5'
             expected_pkgbuild='pkgver=0.2.6'
             result_pkgbuild=$(echo "$sample_pkgbuild" | sed "s/^pkgver=.*/pkgver=$test_new_version/")
@@ -62,7 +41,6 @@ jobs:
               echo "PKGBUILD sed pattern failed: got '$result_pkgbuild', expected '$expected_pkgbuild'"
               exit 1
             fi
-            # Test fin.sol version bump
             sample_finsol='version: "0.2.5"'
             expected_finsol='version: "0.2.6"'
             result_finsol=$(echo "$sample_finsol" | sed "s/^version: *\"[^\"]*\"/version: \"$test_new_version\"/")
@@ -70,7 +48,6 @@ jobs:
               echo "fin.sol sed pattern failed: got '$result_finsol', expected '$expected_finsol'"
               exit 1
             fi
-            # Test flake.nix version bump
             sample_flake='  version = "0.2.5";'
             expected_flake='  version = "0.2.6";'
             result_flake=$(echo "$sample_flake" | sed "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$test_new_version\";/")
@@ -78,7 +55,6 @@ jobs:
               echo "flake.nix sed pattern failed: got '$result_flake', expected '$expected_flake'"
               exit 1
             fi
-            # Test INSTALL.md version bump
             sample_install='Version: 0.2.5'
             expected_install='Version: 0.2.6'
             result_install=$(echo "$sample_install" | sed "s/^Version: .*/Version: $test_new_version/")
@@ -110,54 +86,68 @@ jobs:
     executor: fin-deb-build
     steps:
       - checkout
-      - *restore_cache
+      - restore_cache:
+          keys:
+            - cargo-{{ checksum "Cargo.lock" }}
       - run:
           name: Set Rust Toolchain
-          command: |
-            set -euo pipefail
-            rustup default stable
+          command: rustup default stable
       - run:
           name: Run Clippy
           command: cargo clippy --all-targets --all-features --tests -- -D warnings
       - run:
           name: Check Formatting
           command: cargo fmt -- --check
-      - *save_cache
+      - save_cache:
+          paths:
+            - target
+            - ~/.cargo/registry
+            - ~/.cargo/git
+          key: cargo-{{ checksum "Cargo.lock" }}
 
   test:
     executor: fin-deb-build
     steps:
       - checkout
-      - *restore_cache
+      - restore_cache:
+          keys:
+            - cargo-{{ checksum "Cargo.lock" }}
       - run:
           name: Set Rust Toolchain
-          command: |
-            set -euo pipefail
-            rustup default stable
+          command: rustup default stable
       - run:
           name: Run Tests
           command: cargo test --workspace --release
-      - *save_cache
+      - save_cache:
+          paths:
+            - target
+            - ~/.cargo/registry
+            - ~/.cargo/git
+          key: cargo-{{ checksum "Cargo.lock" }}
 
   build:
     executor: fin-deb-build
     steps:
       - checkout
-      - *restore_cache
+      - restore_cache:
+          keys:
+            - cargo-{{ checksum "Cargo.lock" }}
       - run:
           name: Set Rust Toolchain
-          command: |
-            set -euo pipefail
-            rustup default stable
+          command: rustup default stable
       - run:
           name: Build Release Binary
           command: cargo build --release
-      - *save_cache
+      - save_cache:
+          paths:
+            - target
+            - ~/.cargo/registry
+            - ~/.cargo/git
+          key: cargo-{{ checksum "Cargo.lock" }}
       - persist_to_workspace:
           root: .
           paths:
             - target/release/fin
-            - target/debian  # If needed for release
 
   audit:
     executor: fin-deb-build
@@ -176,9 +166,6 @@ jobs:
       - run:
           name: Run Release Script
           command: ./scripts/release.sh
-    filters:
-      tags:
-        only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/  # Matches tags like v1.2.3 or v1.2.3-beta
 
 workflows:
   build_test_release:
