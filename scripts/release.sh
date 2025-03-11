@@ -20,7 +20,7 @@ for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_SHA1
 done
 echo "✅ All required environment variables are set."
 
-# 2. Store and then unset GH_TOKEN so that GitHub CLI reads from STDIN.
+# 2. Store GH_TOKEN locally and unset it so gh reads from STDIN.
 token="$GH_TOKEN"
 unset GH_TOKEN
 
@@ -44,7 +44,7 @@ if gh release view "v$current_version" >/dev/null 2>&1; then
   exit 0
 fi
 
-# 7. Calculate new version by bumping patch.
+# 7. Calculate new version by bumping the patch number.
 if [[ "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
   major="${BASH_REMATCH[1]}"
   minor="${BASH_REMATCH[2]}"
@@ -66,7 +66,7 @@ sed -i "s|<Version>[^<]*</Version>|<Version>$new_version</Version>|" fin.sol
 sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
 # Replace all occurrences of the old version in INSTALL.md.
 sed -i "s/$current_version/$new_version/g" INSTALL.md
-# Update CHANGELOG.md: if "Unreleased" exists, update; else, prepend header.
+# Update CHANGELOG.md: if "Unreleased" exists, update; else, prepend a header.
 if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
   sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md
 else
@@ -74,7 +74,7 @@ else
   echo "Appended new changelog header."
 fi
 
-# 9. Verify updates in critical files.
+# 9. Verify critical file updates.
 if ! grep -q "<Version>$new_version</Version>" fin.sol; then
   echo "❌ fin.sol did not update to version $new_version"
   exit 1
@@ -133,7 +133,7 @@ if [ ${#assets[@]} -eq 0 ]; then
   done
 fi
 
-# 15. Handle tag: push existing or create new.
+# 15. Handle tag: if it exists, push it; otherwise, create and push.
 if git rev-parse "v$new_version" >/dev/null 2>&1; then
   echo "Tag v$new_version exists locally, pushing tag."
   git push origin "v$new_version"
@@ -156,7 +156,7 @@ else
   fi
 fi
 
-# 17. Auto-merge the bump PR (lookup PR by head branch).
+# 17. Auto-merge the bump PR by looking up the PR by head branch.
 pr_number=$(gh pr list --head "$bump_branch" --json number --jq ".[0].number")
 if [ -n "$pr_number" ]; then
   echo "Auto-merging bump PR #$pr_number"

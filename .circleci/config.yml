@@ -183,7 +183,6 @@ workflows:
       - release:
           requires: [ build, lint, test ]
           filters:
-            branches:
-              only: [ trunk ]
             tags:
               only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
+
