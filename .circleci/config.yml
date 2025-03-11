@@ -266,12 +266,20 @@ jobs:
             else
               git commit -m "Bump version to $new_version"
               git push origin "$branch"
-              gh pr create --fill --base trunk --head "$branch"
+              pr_url=$(gh pr create --fill --base trunk --head "$branch")
+              echo "Created PR: $pr_url"
             fi
 
             # Build and package.
             cargo build --release
             cargo package --allow-dirty
+
+            # Build distro-specific packages.
+            if [ -x ./scripts/build_distro_packages.sh ]; then
+              ./scripts/build_distro_packages.sh
+            else
+              echo "No distro packaging script found, skipping distro package build."
+            fi
 
             # Sign release assets (if they exist).
             shopt -s nullglob
@@ -291,7 +299,6 @@ jobs:
                 assets+=("$file")
               fi
             done
-            # Fallback: try target/package if no assets were found.
             if [ ${#assets[@]} -eq 0 ]; then
               for file in target/package/fin-*; do
                 if [ -f "$file" ]; then
@@ -322,10 +329,15 @@ jobs:
                 gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version" "${assets[@]}"
               fi
             fi
-
-
-
-
+            
+            # Auto-merge bump PR as the final step.
+            pr_number=$(gh pr view --json number --jq ".number")
+            if [ -n "$pr_number" ]; then
+              echo "Auto-merging bump PR #$pr_number"
+              gh pr merge "$pr_number" --squash --delete-branch --auto
+            else
+              echo "No bump PR found to merge."
+            fi
 
 workflows:
   build_test_release:
