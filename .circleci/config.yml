@@ -225,21 +225,26 @@ jobs:
               echo "Bumping version: $current_version → $new_version"
             fi
 
-            # Capture the old version (to update INSTALL.md).
+            # Capture the old version from Cargo.toml.
             old_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
 
-            # Update versions in files.
+            # Update version in files.
             sed -i "s/^version *= *\".*\"/version = \"$new_version\"/" Cargo.toml
             sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD
-            # Update fin.sol XML <Version> tag.
+            # Update fin.sol: change the XML <Version> tag.
             sed -i 's|<Version>[^<]*</Version>|<Version>'"$new_version"'</Version>|' fin.sol
             sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
             # Update INSTALL.md by replacing all occurrences of the old version.
             sed -i "s/$old_version/$new_version/g" INSTALL.md
-            sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md || true
+            # Update CHANGELOG.md header if found; if not, just note it.
+            if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
+              sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md
+            else
+              echo "CHANGELOG.md does not contain an 'Unreleased' header; leaving unchanged."
+            fi
 
-            # Verify that fin.sol and INSTALL.md contain the new version.
-            if ! grep -q "$new_version" fin.sol; then
+            # Verify updates in critical files.
+            if ! grep -q "<Version>$new_version</Version>" fin.sol; then
               echo "❌ fin.sol did not update to version $new_version"
               exit 1
             fi
@@ -280,23 +285,22 @@ jobs:
 
             # Gather asset files.
             assets=()
+            # Look in the expected distro directories...
             for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
               if [ -f "$file" ]; then
                 assets+=("$file")
               fi
             done
-            for file in target/debian/fin_*_amd64.deb.asc target/fin-*-arch.tar.gz.asc target/fin-*-solus.tar.gz.asc target/fin-*-nix.tar.gz.asc; do
-              if [ -f "$file" ]; then
-                assets+=("$file")
-              fi
-            done
-            for file in target/debian/fin_*_amd64.deb.sha256 target/fin-*-arch.tar.gz.sha256 target/fin-*-solus.tar.gz.sha256 target/fin-*-nix.tar.gz.sha256; do
-              if [ -f "$file" ]; then
-                assets+=("$file")
-              fi
-            done
+            # If no assets found, also try in target/package.
+            if [ ${#assets[@]} -eq 0 ]; then
+              for file in target/package/fin-*; do
+                if [ -f "$file" ]; then
+                  assets+=("$file")
+                fi
+              done
+            fi
 
-            # Handle tag: if it exists, push it; otherwise, create and push.
+            # Handle tag: if it exists locally, push it; otherwise, create it.
             if git rev-parse "v$new_version" >/dev/null 2>&1; then
               echo "Tag v$new_version exists locally, pushing tag."
               git push origin "v$new_version"
@@ -306,13 +310,14 @@ jobs:
               git push origin "v$new_version"
             fi
 
-            # Create GitHub release with or without assets.
+            # Create GitHub release.
             if [ ${#assets[@]} -eq 0 ]; then
               echo "No release assets found, creating release without assets."
               gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version"
             else
               gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version" "${assets[@]}"
             fi
+
 
 
 
