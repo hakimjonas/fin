@@ -228,7 +228,7 @@ jobs:
             if git diff --cached --quiet; then
               echo "No changes to commit"
             else
-              git commit -m "Bump version to $new_version [skip ci]"git commit -m "Bump version to $new_version"
+              git commit -m "Bump version to $new_version"
               git push origin "$branch"
               gh pr create --fill --base trunk --head "$branch"
             fi
@@ -252,7 +252,6 @@ jobs:
               target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz \
               target/debian/fin_*_amd64.deb.asc target/fin-*-arch.tar.gz.asc target/fin-*-solus.tar.gz.asc target/fin-*-nix.tar.gz.asc \
               target/debian/fin_*_amd64.deb.sha256 target/fin-*-arch.tar.gz.sha256 target/fin-*-solus.tar.gz.sha256 target/fin-*-nix.tar.gz.sha256
-
 
 workflows:
   build_test_release:
