@@ -200,10 +200,9 @@ jobs:
           name: Authenticate and Release Actions
           command: |
             set -euo pipefail
-            # Save the token locally and then unset GH_TOKEN so it doesn't interfere.
+            # Save and unset the token.
             token="$GH_TOKEN"
             unset GH_TOKEN
-            # Authenticate using the saved token.
             echo "$token" | gh auth login --with-token
             gh auth status
 
@@ -226,17 +225,30 @@ jobs:
               echo "Bumping version: $current_version → $new_version"
             fi
 
-            # Update version in files.
+            # Capture the old version (to update INSTALL.md).
+            old_version=$(awk -F'"' '/^version *= */ {print $2; exit}' Cargo.toml)
+
+            # Update versions in files.
             sed -i "s/^version *= *\".*\"/version = \"$new_version\"/" Cargo.toml
             sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD
-            # For fin.sol, try a more flexible pattern: either with or without quotes.
-            sed -i 's/\(version:\s*"\)[^"]*/\1'"$new_version"'/' fin.sol || sed -i 's/\(version:\s*\)[0-9]\+\.[0-9]\+\.[0-9]\+/\1'"$new_version"'/' fin.sol
-            # For flake.nix.
+            # Update fin.sol XML <Version> tag.
+            sed -i 's|<Version>[^<]*</Version>|<Version>'"$new_version"'</Version>|' fin.sol
             sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
-            # For INSTALL.md, update lines starting with "Version:".
-            sed -i 's/\(Version:\s*\)[0-9]\+\.[0-9]\+\.[0-9]\+/\1'"$new_version"'/' INSTALL.md
+            # Update INSTALL.md by replacing all occurrences of the old version.
+            sed -i "s/$old_version/$new_version/g" INSTALL.md
             sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md || true
 
+            # Verify that fin.sol and INSTALL.md contain the new version.
+            if ! grep -q "$new_version" fin.sol; then
+              echo "❌ fin.sol did not update to version $new_version"
+              exit 1
+            fi
+            if ! grep -q "$new_version" INSTALL.md; then
+              echo "❌ INSTALL.md did not update to version $new_version"
+              exit 1
+            fi
+
+            # Git configuration and commit.
             git config user.email "ci-bot@example.com"
             git config user.name "CI Bot"
             branch="version-bump-$new_version"
@@ -251,10 +263,11 @@ jobs:
               gh pr create --fill --base trunk --head "$branch"
             fi
 
+            # Build and package.
             cargo build --release
             cargo package --allow-dirty
 
-            # Sign files if they exist.
+            # Sign release assets (if they exist).
             shopt -s nullglob
             for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
               if [ -f "$file" ]; then
@@ -265,7 +278,7 @@ jobs:
               fi
             done
 
-            # Gather asset files that exist.
+            # Gather asset files.
             assets=()
             for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
               if [ -f "$file" ]; then
@@ -283,12 +296,25 @@ jobs:
               fi
             done
 
+            # Handle tag: if it exists, push it; otherwise, create and push.
+            if git rev-parse "v$new_version" >/dev/null 2>&1; then
+              echo "Tag v$new_version exists locally, pushing tag."
+              git push origin "v$new_version"
+            else
+              echo "Creating new tag v$new_version."
+              git tag "v$new_version"
+              git push origin "v$new_version"
+            fi
+
+            # Create GitHub release with or without assets.
             if [ ${#assets[@]} -eq 0 ]; then
               echo "No release assets found, creating release without assets."
               gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version"
             else
               gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version" "${assets[@]}"
             fi
+
+
 
 workflows:
   build_test_release:
