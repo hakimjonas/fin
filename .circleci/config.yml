@@ -236,11 +236,12 @@ jobs:
             sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
             # Update INSTALL.md by replacing all occurrences of the old version.
             sed -i "s/$old_version/$new_version/g" INSTALL.md
-            # Update CHANGELOG.md header if found; if not, just note it.
+            # Update CHANGELOG.md:
             if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
               sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md
             else
-              echo "CHANGELOG.md does not contain an 'Unreleased' header; leaving unchanged."
+              echo "## [$new_version] - $(date +%Y-%m-%d)" | cat - CHANGELOG.md > tmp && mv tmp CHANGELOG.md
+              echo "Appended new changelog header."
             fi
 
             # Verify updates in critical files.
@@ -285,13 +286,12 @@ jobs:
 
             # Gather asset files.
             assets=()
-            # Look in the expected distro directories...
             for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
               if [ -f "$file" ]; then
                 assets+=("$file")
               fi
             done
-            # If no assets found, also try in target/package.
+            # Fallback: try target/package if no assets were found.
             if [ ${#assets[@]} -eq 0 ]; then
               for file in target/package/fin-*; do
                 if [ -f "$file" ]; then
@@ -300,7 +300,7 @@ jobs:
               done
             fi
 
-            # Handle tag: if it exists locally, push it; otherwise, create it.
+            # Handle tag: if it exists, push it; otherwise, create and push.
             if git rev-parse "v$new_version" >/dev/null 2>&1; then
               echo "Tag v$new_version exists locally, pushing tag."
               git push origin "v$new_version"
@@ -310,13 +310,19 @@ jobs:
               git push origin "v$new_version"
             fi
 
-            # Create GitHub release.
-            if [ ${#assets[@]} -eq 0 ]; then
-              echo "No release assets found, creating release without assets."
-              gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version"
+            # Create or update GitHub release.
+            if gh release view "v$new_version" >/dev/null 2>&1; then
+              echo "Release v$new_version already exists; updating release."
+              gh release edit "v$new_version" --title "Release v$new_version" --notes "Release $new_version"
             else
-              gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version" "${assets[@]}"
+              if [ ${#assets[@]} -eq 0 ]; then
+                echo "No release assets found, creating release without assets."
+                gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version"
+              else
+                gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version" "${assets[@]}"
+              fi
             fi
+
 
 
 
