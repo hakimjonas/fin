@@ -10,10 +10,10 @@ You can find pre-built packages here for various distributions:
 
 ### Available Packages
 
-- `fin-0.2.5-arch.tar.gz` (811 KB) - 2025-02-11T23:22:55Z
-- `fin-0.2.5-nix.tar.gz` (811 KB) - 2025-02-11T23:22:56Z
-- `fin-0.2.5-solus.tar.gz` (811 KB) - 2025-02-11T23:22:55Z
-- `fin_0.2.5_amd64.deb` (632 KB) - 2025-02-11T23:22:54Z
+- `fin-0.2.6-arch.tar.gz` (811 KB) - 2025-02-11T23:22:55Z
+- `fin-0.2.6-nix.tar.gz` (811 KB) - 2025-02-11T23:22:56Z
+- `fin-0.2.6-solus.tar.gz` (811 KB) - 2025-02-11T23:22:55Z
+- `fin_0.2.6_amd64.deb` (632 KB) - 2025-02-11T23:22:54Z
 - Source code (zip) - 2025-02-11T23:13:13Z
 - Source code (tar.gz) - 2025-02-11T23:13:13Z
 
