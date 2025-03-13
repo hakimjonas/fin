@@ -112,11 +112,17 @@ workflows:
       - env_check
       - verify_files
       - lint:
-          requires: [ env_check, verify_files ]
+          requires:
+            - env_check
+            - verify_files
       - test:
-          requires: [ env_check, verify_files ]
+          requires:
+            - env_check
+            - verify_files
       - build:
-          requires: [ env_check, verify_files ]
+          requires:
+            - env_check
+            - verify_files
       - bump:
           requires:
             - lint
@@ -128,6 +134,7 @@ workflows:
               ignore: /^version-bump-.*/
             tags:
               ignore: /.*/
+
 
 
   release_on_tag:
