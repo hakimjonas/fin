@@ -66,26 +66,25 @@ fi
 git commit -m "Bump version to $new_version"
 git push origin "$bump_branch"
 
-# Create a PR using GitHub CLI and auto-merge it.
+# Create the PR via GitHub CLI
 pr_url=$(gh pr create --fill --base trunk --head "$bump_branch" --title "Version bump to $new_version" --body "Automatic version bump")
 echo "Created bump PR: $pr_url"
 
-# Auto-merge the bump PR (GitHub will auto-merge after all required checks pass).
+# Request auto-merge by GitHub
 gh pr merge "$pr_url" --squash --delete-branch --auto
 
-# Wait for GitHub to merge the PR before proceeding.
+# Wait for PR merge
 echo "Waiting for PR merge to complete..."
 until gh pr view "$pr_url" --json merged -q '.merged' | grep -q 'true'; do
   echo "PR not yet merged, sleeping for 10 seconds..."
   sleep 10
 done
+echo "PR merged successfully."
 
-echo "PR successfully merged!"
-
-# Checkout trunk, pull the merged changes, and tag the new version.
+# After merge, explicitly pull latest trunk & push the tag
 git checkout trunk
 git pull origin trunk
 git tag "v$new_version"
 git push origin "v$new_version"
 
-echo "✅ Version bump PR merged and tagged successfully."
+echo "=== Tag v$new_version pushed successfully ==="
