@@ -51,7 +51,7 @@ bump_branch="version-bump-$new_version"
 git checkout -b "$bump_branch"
 git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md
 
-git commit -m "Bump version to $new_version [skip ci]"
+git commit -m "Bump version to $new_version"
 git push origin "$bump_branch"
 
 pr_url=$(gh pr create --fill --base trunk --head "$bump_branch" --title "Version bump to $new_version" --body "Automatic bump")
