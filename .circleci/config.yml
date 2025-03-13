@@ -34,7 +34,7 @@ jobs:
             required_files=(Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md)
             for file in "${required_files[@]}"; do
               if [ ! -f "$file" ]; then
-                echo "❌ Required file '$file' does not exist!"
+                echo "❌ Required file '$file' missing!"
                 exit 1
               else
                 echo "✅ File '$file' exists."
@@ -48,15 +48,9 @@ jobs:
       - restore_cache:
           keys:
             - cargo-{{ checksum "Cargo.lock" }}
-      - run:
-          name: Set Rust Toolchain
-          command: rustup default stable
-      - run:
-          name: Run Clippy
-          command: cargo clippy --all-targets --all-features --tests -- -D warnings
-      - run:
-          name: Check Formatting
-          command: cargo fmt -- --check
+      - run: rustup default stable
+      - run: cargo clippy --all-targets --all-features --tests -- -D warnings
+      - run: cargo fmt -- --check
       - save_cache:
           paths:
             - target
@@ -71,12 +65,8 @@ jobs:
       - restore_cache:
           keys:
             - cargo-{{ checksum "Cargo.lock" }}
-      - run:
-          name: Set Rust Toolchain
-          command: rustup default stable
-      - run:
-          name: Run Tests
-          command: cargo test --workspace --release
+      - run: rustup default stable
+      - run: cargo test --workspace --release
       - save_cache:
           paths:
             - target
@@ -91,18 +81,8 @@ jobs:
       - restore_cache:
           keys:
             - cargo-{{ checksum "Cargo.lock" }}
-      - run:
-          name: Set Rust Toolchain
-          command: rustup default stable
-      - run:
-          name: Build Release Binary
-          command: cargo build --release
-      - save_cache:
-          paths:
-            - target
-            - ~/.cargo/registry
-            - ~/.cargo/git
-          key: cargo-{{ checksum "Cargo.lock" }}
+      - run: rustup default stable
+      - run: cargo build --release
       - persist_to_workspace:
           root: .
           paths:
@@ -114,14 +94,7 @@ jobs:
       - checkout
       - run:
           name: Trigger Version Bump
-          command: |
-            # Use CIRCLE_BRANCH to determine the branch name.
-            if [ "${CIRCLE_BRANCH:-}" = "trunk" ]; then
-              echo "On trunk. Running version bump script..."
-              ./scripts/version-bump.sh
-            else
-              echo "Not on trunk. Skipping version bump."
-            fi
+          command: ./scripts/version-bump.sh
 
   release:
     executor: fin-deb-build
@@ -139,25 +112,20 @@ workflows:
       - env_check
       - verify_files
       - lint:
-          requires:
-            - env_check
-            - verify_files
+          requires: [ env_check, verify_files ]
       - test:
-          requires:
-            - env_check
-            - verify_files
+          requires: [ env_check, verify_files ]
       - build:
-          requires:
-            - env_check
-            - verify_files
+          requires: [ env_check, verify_files ]
       - bump:
-          requires:
-            - build
+          requires: [ lint, test, build ]
           filters:
             branches:
               only: trunk
+            tags:
+              ignore: /.*/
 
-  release:
+  release_on_tag:
     jobs:
       - release:
           filters:
@@ -165,3 +133,4 @@ workflows:
               only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
             branches:
               ignore: /.*/
+
