@@ -118,12 +118,17 @@ workflows:
       - build:
           requires: [ env_check, verify_files ]
       - bump:
-          requires: [ lint, test, build ]
+          requires:
+            - lint
+            - test
+            - build
           filters:
             branches:
               only: trunk
+              ignore: /^version-bump-.*/
             tags:
               ignore: /.*/
+
 
   release_on_tag:
     jobs:
