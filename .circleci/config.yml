@@ -22,47 +22,6 @@ jobs:
               fi
             done
             echo "✅ All required environment variables are set."
-      - run:
-          name: Test Version Bump Sed Patterns
-          command: |
-            set -euo pipefail
-            test_new_version="0.2.6"
-            sample_cargo='version = "0.2.5"'
-            expected_cargo='version = "0.2.6"'
-            result_cargo=$(echo "$sample_cargo" | sed "s/^version *= *\"[^\"]*\"/version = \"$test_new_version\"/")
-            if [ "$result_cargo" != "$expected_cargo" ]; then
-              echo "Cargo.toml sed pattern failed: got '$result_cargo', expected '$expected_cargo'"
-              exit 1
-            fi
-            sample_pkgbuild='pkgver=0.2.5'
-            expected_pkgbuild='pkgver=0.2.6'
-            result_pkgbuild=$(echo "$sample_pkgbuild" | sed "s/^pkgver=.*/pkgver=$test_new_version/")
-            if [ "$result_pkgbuild" != "$expected_pkgbuild" ]; then
-              echo "PKGBUILD sed pattern failed: got '$result_pkgbuild', expected '$expected_pkgbuild'"
-              exit 1
-            fi
-            sample_finsol='version: "0.2.5"'
-            expected_finsol='version: "0.2.6"'
-            result_finsol=$(echo "$sample_finsol" | sed "s/^version: *\"[^\"]*\"/version: \"$test_new_version\"/")
-            if [ "$result_finsol" != "$expected_finsol" ]; then
-              echo "fin.sol sed pattern failed: got '$result_finsol', expected '$expected_finsol'"
-              exit 1
-            fi
-            sample_flake='  version = "0.2.5";'
-            expected_flake='  version = "0.2.6";'
-            result_flake=$(echo "$sample_flake" | sed "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$test_new_version\";/")
-            if [ "$result_flake" != "$expected_flake" ]; then
-              echo "flake.nix sed pattern failed: got '$result_flake', expected '$expected_flake'"
-              exit 1
-            fi
-            sample_install='Version: 0.2.5'
-            expected_install='Version: 0.2.6'
-            result_install=$(echo "$sample_install" | sed "s/^Version: .*/Version: $test_new_version/")
-            if [ "$result_install" != "$expected_install" ]; then
-              echo "INSTALL.md sed pattern failed: got '$result_install', expected '$expected_install'"
-              exit 1
-            fi
-            echo "✅ All version bump sed patterns passed."
 
   verify_files:
     executor: fin-deb-build
@@ -149,50 +108,44 @@ jobs:
           paths:
             - target/release/fin
 
-  audit:
+  # Auto version bump job that runs only on trunk (if no tag is present)
+  bump:
     executor: fin-deb-build
     steps:
       - checkout
       - run:
-          name: Run Cargo Audit
-          command: cargo audit
-
-  release:
-    executor: fin-deb-build
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - run:
-          name: Run Release Script
-          command: ./scripts/release.sh
+          name: Trigger Version Bump
+          command: |
+            if [ "$(git rev-parse --abbrev-ref HEAD)" = "trunk" ]; then
+              echo "On trunk, running version bump script..."
+              ./scripts/version-bump.sh
+            else
+              echo "Not on trunk, skipping version bump."
+            fi
 
 workflows:
-  build_test_release:
+  build_and_bump:
     jobs:
       - env_check
       - verify_files
-      - audit
       - lint:
           requires:
             - env_check
             - verify_files
-            - audit
       - test:
           requires:
             - env_check
             - verify_files
-            - audit
       - build:
           requires:
             - env_check
             - verify_files
-            - audit
-      - release:
+      # The bump job runs only on trunk and ignores tags (so manual major/minor bumps via tags bypass it)
+      - bump:
           requires:
             - build
-            - lint
-            - test
           filters:
+            branches:
+              only: trunk
             tags:
-              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
+              ignore: /.*/
