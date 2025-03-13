@@ -18,7 +18,7 @@ for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_SHA1
 done
 echo "✅ All required environment variables are set."
 
-# Store GH_TOKEN locally and then unset it.
+# Store GH_TOKEN locally and unset it.
 token="$GH_TOKEN"
 unset GH_TOKEN
 

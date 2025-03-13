@@ -3,10 +3,9 @@ set -euo pipefail
 
 echo "=== Starting Version Bump Process ==="
 
-# Ensure we are on trunk
-current_branch=$(git rev-parse --abbrev-ref HEAD)
-if [ "$current_branch" != "trunk" ]; then
-  echo "Not on trunk. Exiting version bump."
+# Use CIRCLE_BRANCH for branch identification.
+if [ "${CIRCLE_BRANCH:-}" != "trunk" ]; then
+  echo "Current branch (${CIRCLE_BRANCH:-}) is not trunk. Exiting version bump."
   exit 0
 fi
 
@@ -19,11 +18,11 @@ for var in GH_TOKEN CIRCLE_SHA1; do
 done
 echo "✅ Required environment variables are set."
 
-# Determine the current version from Cargo.toml
+# Determine current version from Cargo.toml
 current_version=$(awk -F'"' '/^version *=/ {print $2; exit}' Cargo.toml)
 echo "Current version: $current_version"
 
-# Bump the patch version (auto patch bump)
+# Bump patch version.
 if [[ "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
   major="${BASH_REMATCH[1]}"
   minor="${BASH_REMATCH[2]}"
@@ -43,14 +42,14 @@ sed -i "s|<Version>[^<]*</Version>|<Version>$new_version</Version>|" fin.sol
 sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
 sed -i "s/$current_version/$new_version/g" INSTALL.md
 
-# Update CHANGELOG.md: update "Unreleased" header if present, else prepend a new header.
+# Update CHANGELOG.md.
 if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
   sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md
 else
   echo -e "## [$new_version] - $(date +%Y-%m-%d)\n" | cat - CHANGELOG.md > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
 fi
 
-# Create a new branch for the version bump.
+# Create a new branch for the bump.
 bump_branch="version-bump-$new_version"
 git checkout -b "$bump_branch"
 git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md

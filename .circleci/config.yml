@@ -108,7 +108,6 @@ jobs:
           paths:
             - target/release/fin
 
-  # Auto version bump job that runs only on trunk (if no tag is present)
   bump:
     executor: fin-deb-build
     steps:
@@ -116,12 +115,23 @@ jobs:
       - run:
           name: Trigger Version Bump
           command: |
-            if [ "$(git rev-parse --abbrev-ref HEAD)" = "trunk" ]; then
-              echo "On trunk, running version bump script..."
+            # Use CIRCLE_BRANCH to determine the branch name.
+            if [ "${CIRCLE_BRANCH:-}" = "trunk" ]; then
+              echo "On trunk. Running version bump script..."
               ./scripts/version-bump.sh
             else
-              echo "Not on trunk, skipping version bump."
+              echo "Not on trunk. Skipping version bump."
             fi
+
+  release:
+    executor: fin-deb-build
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Run Release Script
+          command: ./scripts/release.sh
 
 workflows:
   build_and_bump:
@@ -140,7 +150,6 @@ workflows:
           requires:
             - env_check
             - verify_files
-      # The bump job runs only on trunk and ignores tags (so manual major/minor bumps via tags bypass it)
       - bump:
           requires:
             - build
@@ -149,3 +158,10 @@ workflows:
               only: trunk
             tags:
               ignore: /.*/
+
+  release_on_tag:
+    jobs:
+      - release:
+          filters:
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
