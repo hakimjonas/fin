@@ -49,6 +49,10 @@ else
   echo -e "## [$new_version] - $(date +%Y-%m-%d)\n" | cat - CHANGELOG.md > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
 fi
 
+# Set Git identity explicitly (needed for CI)
+git config user.email "ci-bot@example.com"
+git config user.name "CI Bot"
+
 # Create a new branch for the bump.
 bump_branch="version-bump-$new_version"
 git checkout -b "$bump_branch"
