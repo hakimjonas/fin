@@ -134,7 +134,7 @@ jobs:
           command: ./scripts/release.sh
 
 workflows:
-  build_and_bump:
+  build_test_and_bump:
     jobs:
       - env_check
       - verify_files
@@ -156,12 +156,12 @@ workflows:
           filters:
             branches:
               only: trunk
-            tags:
-              ignore: /.*/
 
-  release_on_tag:
+  release:
     jobs:
       - release:
           filters:
             tags:
               only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
+            branches:
+              ignore: /.*/
