@@ -1,95 +1,92 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "=== Starting Release Process ==="
+echo "=== Starting Version Bump Process ==="
 
-# Exit if no tag is detected.
-if [ -z "${CIRCLE_TAG:-}" ]; then
-  echo "No tag detected. Exiting release process."
+# Ensure we're on trunk
+if [ "${CIRCLE_BRANCH:-}" != "trunk" ]; then
+  echo "Current branch (${CIRCLE_BRANCH:-}) is not trunk. Exiting version bump."
   exit 0
 fi
 
 # Verify required environment variables.
-for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_SHA1; do
+for var in GH_TOKEN CIRCLE_SHA1; do
   if [ -z "${!var:-}" ]; then
     echo "❌ $var is not set!"
     exit 1
   fi
 done
-echo "✅ All required environment variables are set."
+echo "✅ Required environment variables are set."
 
-# Store GH_TOKEN locally and unset it.
-token="$GH_TOKEN"
-unset GH_TOKEN
-
-# Authenticate with GitHub CLI.
-echo "$token" | gh auth login --with-token
-gh auth status
-
-# Configure GPG.
-mkdir -p ~/.gnupg
-chmod 700 ~/.gnupg
-printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import
-echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
-
-# Determine new version from the tag.
-new_version="${CIRCLE_TAG#v}"
-echo "Tag detected: releasing version $new_version"
-
-# Build and package.
-rustup default stable
-cargo build --release
-cargo package --allow-dirty
-echo "Packaging distribution-specific files..."
-cargo make package
-
-# Sign release assets.
-shopt -s nullglob
-for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
-  if [ -f "$file" ]; then
-    gpg --detach-sign --armor "$file"
-    sha256sum "$file" > "$file.sha256"
-  else
-    echo "File $file does not exist, skipping signing."
-  fi
-done
-
-# Gather asset files.
-assets=()
-for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
-  if [ -f "$file" ]; then
-    assets+=("$file")
-  fi
-done
-if [ ${#assets[@]} -eq 0 ]; then
-  for file in target/package/fin-*; do
-    if [ -f "$file" ]; then
-      assets+=("$file")
-    fi
-  done
+# Prevent infinite loops by checking the last commit message.
+if git log -1 --pretty=%B | grep -q "Bump version to"; then
+  echo "🚫 Last commit is already a version bump. Exiting to prevent infinite loop."
+  exit 0
 fi
 
-# Ensure the tag exists locally and push it if necessary.
-if git rev-parse "v$new_version" >/dev/null 2>&1; then
-  echo "Tag v$new_version exists locally, pushing tag."
-  git push origin "v$new_version"
+# Determine current version from Cargo.toml
+current_version=$(awk -F'"' '/^version *=/ {print $2; exit}' Cargo.toml)
+echo "Current version: $current_version"
+
+# Bump patch version.
+if [[ "$current_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(-.*)?$ ]]; then
+  major="${BASH_REMATCH[1]}"
+  minor="${BASH_REMATCH[2]}"
+  patch="${BASH_REMATCH[3]}"
+  new_patch=$((patch + 1))
+  new_version="${major}.${minor}.${new_patch}"
+  echo "Bumping version: $current_version -> $new_version"
 else
-  echo "Creating new tag v$new_version."
-  git tag "v$new_version"
-  git push origin "v$new_version"
+  echo "❌ Invalid version format: $current_version"
+  exit 1
 fi
 
-# Create or update the GitHub release.
-if gh release view "v$new_version" >/dev/null 2>&1; then
-  echo "Release v$new_version exists; updating release."
-  gh release edit "v$new_version" --title "Release v$new_version" --notes "Release $new_version"
+# Update version in files.
+sed -i "s/^version *= *\"[^\"]*\"/version = \"$new_version\"/" Cargo.toml
+sed -i "s/^pkgver=.*/pkgver=$new_version/" PKGBUILD
+sed -i "s|<Version>[^<]*</Version>|<Version>$new_version</Version>|" fin.sol
+sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
+sed -i "s/$current_version/$new_version/g" INSTALL.md
+
+# Update CHANGELOG.md.
+if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
+  sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md
 else
-  if [ ${#assets[@]} -eq 0 ]; then
-    echo "No assets found. Creating release without assets."
-    gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version"
-  else
-    gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version" "${assets[@]}"
-  fi
+  echo -e "## [$new_version] - $(date +%Y-%m-%d)\n" | cat - CHANGELOG.md > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
 fi
 
-echo "=== Release process complete. New version: $new_version ==="
+# Set Git identity explicitly (needed for CI)
+git config user.email "ci-bot@example.com"
+git config user.name "CI Bot"
+
+# Create a new branch for the bump.
+bump_branch="version-bump-$new_version"
+git checkout -b "$bump_branch"
+git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md
+
+if git diff --cached --quiet; then
+  echo "No changes detected. Exiting."
+  exit 0
+fi
+
+git commit -m "Bump version to $new_version"
+git push origin "$bump_branch"
+
+# Create a PR using GitHub CLI.
+pr_url=$(gh pr create --fill --base trunk --head "$bump_branch" --title "Version bump to $new_version" --body "Automatic version bump")
+echo "Created bump PR: $pr_url"
+
+# Merge PR when checks pass.
+gh pr merge "$bump_branch" --squash --delete-branch --auto
+echo "✅ Version bump PR merged successfully."
+
+# Ensure we have the latest trunk
+git checkout trunk
+git pull origin trunk
+
+# Create a new tag for the version
+git tag "v$new_version"
+git push origin "v$new_version"
+echo "✅ Created and pushed tag v$new_version"
+
+echo "=== Version bump process complete. New version: $new_version ==="

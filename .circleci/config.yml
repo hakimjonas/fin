@@ -121,12 +121,10 @@ workflows:
             - verify_files
       - build:
           requires:
-            - env_check
-            - verify_files
-      - bump:
-          requires:
             - lint
             - test
+      - bump:
+          requires:
             - build
           filters:
             branches:
@@ -135,14 +133,11 @@ workflows:
             tags:
               ignore: /.*/
 
-
-
   release_on_tag:
     jobs:
       - release:
+          requires:
+            - bump
           filters:
             tags:
               only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
-            branches:
-              ignore: /.*/
-
