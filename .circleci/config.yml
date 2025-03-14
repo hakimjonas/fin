@@ -115,17 +115,15 @@ workflows:
           requires:
             - env_check
             - verify_files
-      - test:
-          requires:
-            - env_check
-            - verify_files
       - build:
           requires:
             - lint
-            - test
-      - bump:
+      - test:
           requires:
             - build
+      - bump:
+          requires:
+            - test
           filters:
             branches:
               only: trunk
