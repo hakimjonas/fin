@@ -76,8 +76,12 @@ git push origin "$bump_branch"
 pr_url=$(gh pr create --fill --base trunk --head "$bump_branch" --title "Version bump to $new_version" --body "Automatic version bump")
 echo "Created bump PR: $pr_url"
 
-# Merge PR when checks pass.
-gh pr merge "$bump_branch" --squash --delete-branch --auto
+# Wait for PR to be merged.
+echo "Waiting for PR to be merged..."
+until gh pr view "$bump_branch" --json merged --jq '.merged' | grep -q "true"; do
+  echo "🔄 PR not merged yet, retrying in 10 seconds..."
+  sleep 10
+done
 echo "✅ Version bump PR merged successfully."
 
 # Ensure we have the latest trunk
