@@ -25,7 +25,7 @@ echo "✅ All required environment variables are set."
 
 # Authenticate with GitHub CLI.
 echo "$GH_TOKEN" | gh auth login --with-token
-gh auth status
+gh auth status || { echo "❌ GitHub CLI authentication failed"; exit 1; }
 
 # Configure GPG.
 mkdir -p ~/.gnupg
