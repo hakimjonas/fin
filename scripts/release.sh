@@ -25,6 +25,7 @@ echo "✅ All required environment variables are set."
 
 # Authenticate with GitHub CLI.
 echo "Authenticating with GitHub CLI..."
+gh auth logout  # Clear any existing credentials
 echo "$GH_TOKEN" | gh auth login --with-token
 if gh auth status; then
   echo "✅ GitHub CLI authentication successful."
