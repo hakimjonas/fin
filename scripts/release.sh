@@ -23,16 +23,9 @@ for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_SHA1
 done
 echo "✅ All required environment variables are set."
 
-# Authenticate with GitHub CLI.
-echo "Authenticating with GitHub CLI..."
-gh auth logout  # Clear any existing credentials
-echo "$FINE" | gh auth login --with-token
-if gh auth status; then
-  echo "✅ GitHub CLI authentication successful."
-else
-  echo "❌ GitHub CLI authentication failed."
-  exit 1
-fi
+# Repository details (adjusted based on your repo URL)
+REPO_OWNER="hakimjonas"
+REPO_NAME="fin"
 
 # Configure GPG.
 mkdir -p ~/.gnupg
@@ -51,5 +44,31 @@ for file in target/package/fin-*; do
   sha256sum "$file" > "$file.sha256"
 done
 
-# Create GitHub release.
-gh release create "$new_version" --title "Release $new_version" --notes "Release $new_version" target/package/*
+# Create GitHub release using the GitHub API.
+api_url="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases"
+release_payload=$(cat <<EOF
+{
+  "tag_name": "$new_version",
+  "name": "Release $new_version",
+  "body": "Release $new_version",
+  "draft": false,
+  "prerelease": false
+}
+EOF
+)
+
+echo "Creating GitHub release..."
+release_response=$(curl -s -X POST "$api_url" \
+  -H "Authorization: token $GH_TOKEN" \
+  -H "Accept: application/vnd.github.v3+json" \
+  -d "$release_payload")
+
+if echo "$release_response" | grep -q '"html_url"'; then
+  echo "✅ GitHub release created successfully."
+else
+  echo "❌ Failed to create GitHub release."
+  echo "Response: $release_response"
+  exit 1
+fi
+
+echo "Release process completed successfully."
