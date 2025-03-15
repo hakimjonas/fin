@@ -40,8 +40,10 @@ cargo make package
 
 # Sign release assets.
 for file in target/package/fin-*; do
-  gpg --detach-sign --armor "$file"
-  sha256sum "$file" > "$file.sha256"
+  if [[ -f "$file" ]]; then
+    gpg --detach-sign --armor "$file"
+    sha256sum "$file" > "$file.sha256"
+  fi
 done
 
 # Create GitHub release using the GitHub API.
