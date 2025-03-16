@@ -3,15 +3,11 @@ set -euo pipefail
 
 echo "=== Starting Release Process ==="
 
-# Ensure we have the latest tags
-git fetch --tags
+# Force-fetch all tags to update local ones and avoid conflicts (e.g. unwanted old tags).
+git fetch --tags --force
 
-# Determine new version.
-# Option 1: Extract version from Cargo.toml and force a "v" prefix.
+# Determine new version by reading Cargo.toml and forcing a "v" prefix.
 new_version=$(grep '^version' Cargo.toml | sed -E 's/version *= *"(.*)"/v\1/')
-# Alternatively, you could use:
-# new_version=$(git describe --tags --match "v*" --abbrev=0)
-
 if [[ -z "$new_version" ]]; then
   echo "❌ Could not determine new version. Exiting release process."
   exit 1
@@ -27,7 +23,7 @@ for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_SHA1
 done
 echo "✅ All required environment variables are set."
 
-# Repository details (based on your repo URL)
+# Repository details.
 REPO_OWNER="hakimjonas"
 REPO_NAME="fin"
 
@@ -93,7 +89,7 @@ fi
 upload_url=$(echo "$release_response" | jq -r '.upload_url' | sed 's/{?name,label}//')
 echo "Parsed upload URL: $upload_url"
 
-# List of artifact patterns to upload.
+# Define artifact patterns for your distro-specific assets.
 assets=(
   "target/debian/fin_*.deb"
   "target/fin-*-solus.tar.gz"
