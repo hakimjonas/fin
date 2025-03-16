@@ -42,7 +42,7 @@ cargo make package
 for file in target/package/fin-*; do
   if [[ -f "$file" ]]; then
     echo "🔑 Signing file: $file"
-    gpg --detach-sign --armor "$file"
+    gpg --batch --yes --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" --detach-sign --armor "$file"
     sha256sum "$file" > "$file.sha256"
   else
     echo "⚠️ Skipping non-file: $file"
