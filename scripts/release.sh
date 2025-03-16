@@ -3,13 +3,13 @@ set -euo pipefail
 
 echo "=== Starting Release Process ==="
 
-# Ensure we have the latest tags
-git fetch --tags
+# Force-fetch tags to update local tags and avoid conflicts.
+git fetch --tags --force
 
-# Detect latest version from tag.
-new_version=$(git describe --tags --abbrev=0)
+# Determine new version by reading Cargo.toml and forcing a "v" prefix.
+new_version=$(grep '^version' Cargo.toml | head -n 1 | sed -E 's/version *= *"(.*)"/v\1/' | tr -d '\n')
 if [[ -z "$new_version" ]]; then
-  echo "❌ No version tag found. Exiting release process."
+  echo "❌ Could not determine new version. Exiting release process."
   exit 1
 fi
 echo "Tag detected: releasing version $new_version"
@@ -23,11 +23,24 @@ for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_SHA1
 done
 echo "✅ All required environment variables are set."
 
-# Repository details (adjusted based on your repo URL)
+# Repository details.
 REPO_OWNER="hakimjonas"
 REPO_NAME="fin"
 
-# Configure GPG.
+# Optional: Print the Cargo.toml version for debugging.
+echo "Current Cargo.toml version:"
+grep '^version' Cargo.toml
+
+# Ensure the tag exists.
+if ! git rev-parse "$new_version" >/dev/null 2>&1; then
+  echo "Tag $new_version does not exist locally. Creating it..."
+  git tag "$new_version" -m "Release $new_version"
+  git push origin "$new_version"
+else
+  echo "Tag $new_version already exists."
+fi
+
+# Configure GPG: Import your key and set non-interactive mode.
 mkdir -p ~/.gnupg
 chmod 700 ~/.gnupg
 printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import
@@ -38,7 +51,7 @@ cargo build --release
 cargo package --allow-dirty
 cargo make package
 
-# Sign release assets.
+# Sign release assets – only process regular files.
 for file in target/package/fin-*; do
   if [[ -f "$file" ]]; then
     echo "🔑 Signing file: $file"
@@ -51,26 +64,23 @@ done
 
 echo "✅ Finished signing assets."
 
-# Create GitHub release using the GitHub API.
+# Create GitHub release.
 api_url="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases"
-release_payload=$(cat <<EOF
-{
-  "tag_name": "$new_version",
-  "name": "Release $new_version",
-  "body": "Release $new_version",
-  "draft": false,
-  "prerelease": false
-}
-EOF
-)
+
+# Use jq to generate a valid JSON payload.
+release_payload=$(jq -n \
+  --arg tag "$new_version" \
+  --arg name "Release $new_version" \
+  --arg body "Release $new_version" \
+  '{tag_name: $tag, name: $name, body: $body, draft: false, prerelease: false}')
 
 echo "🚀 Creating GitHub release..."
-release_response=$(curl -s -v --max-time 30 -X POST "$api_url" \
+release_response=$(curl -s -X POST "$api_url" \
   -H "Authorization: token $GH_TOKEN" \
   -H "Accept: application/vnd.github.v3+json" \
   -d "$release_payload")
 
-echo "🔍 Curl response:"
+echo "Release response:"
 echo "$release_response"
 
 if echo "$release_response" | grep -q '"html_url"'; then
@@ -80,5 +90,32 @@ else
   echo "Response: $release_response"
   exit 1
 fi
+
+# Parse the upload URL from the release response.
+upload_url=$(echo "$release_response" | jq -r '.upload_url' | sed 's/{?name,label}//')
+echo "Parsed upload URL: $upload_url"
+
+# Define artifact patterns for distro-specific assets.
+assets=(
+  "target/debian/fin_*.deb"
+  "target/fin-*-solus.tar.gz"
+  "target/fin-*-arch.tar.gz"
+  "target/fin-*-nix.tar.gz"
+)
+
+# Upload each asset.
+for pattern in "${assets[@]}"; do
+  for asset in $pattern; do
+    if [[ -f "$asset" ]]; then
+      echo "Uploading asset: $asset"
+      curl -s --data-binary @"$asset" \
+        -H "Content-Type: application/octet-stream" \
+        -H "Authorization: token $GH_TOKEN" \
+        "$upload_url?name=$(basename "$asset")"
+    else
+      echo "No asset found for pattern: $pattern"
+    fi
+  done
+done
 
 echo "Release process completed successfully."

@@ -7,7 +7,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     pkg-config \
     git \
-    ca-certificates
+    ca-certificates \
+    jq
 
 # Install GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
