@@ -3,11 +3,16 @@ set -euo pipefail
 
 echo "=== Starting Release Process ==="
 
-# Exit if no tag is detected.
-if [ -z "${CIRCLE_TAG:-}" ]; then
-  echo "No tag detected. Exiting release process."
-  exit 0
+# Ensure we have the latest tags
+git fetch --tags
+
+# Detect latest version from tag.
+new_version=$(git describe --tags --abbrev=0)
+if [[ -z "$new_version" ]]; then
+  echo "❌ No version tag found. Exiting release process."
+  exit 1
 fi
+echo "Tag detected: releasing version $new_version"
 
 # Verify required environment variables.
 for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_SHA1; do
@@ -18,13 +23,9 @@ for var in GH_TOKEN FINE_SIGNATURE_KEY_B64 FINE_SIGNATURE_PASSPHRASE CIRCLE_SHA1
 done
 echo "✅ All required environment variables are set."
 
-# Store GH_TOKEN locally and unset it.
-token="$GH_TOKEN"
-unset GH_TOKEN
-
-# Authenticate with GitHub CLI.
-echo "$token" | gh auth login --with-token
-gh auth status
+# Repository details (adjusted based on your repo URL)
+REPO_OWNER="hakimjonas"
+REPO_NAME="fin"
 
 # Configure GPG.
 mkdir -p ~/.gnupg
@@ -32,64 +33,52 @@ chmod 700 ~/.gnupg
 printf '%s' "$FINE_SIGNATURE_KEY_B64" | base64 -d | gpg --batch --import
 echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
 
-# Determine new version from the tag.
-new_version="${CIRCLE_TAG#v}"
-echo "Tag detected: releasing version $new_version"
-
 # Build and package.
-rustup default stable
 cargo build --release
 cargo package --allow-dirty
-echo "Packaging distribution-specific files..."
 cargo make package
 
 # Sign release assets.
-shopt -s nullglob
-for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
-  if [ -f "$file" ]; then
-    gpg --detach-sign --armor "$file"
+for file in target/package/fin-*; do
+  if [[ -f "$file" ]]; then
+    echo "🔑 Signing file: $file"
+    gpg --batch --yes --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" --detach-sign --armor "$file"
     sha256sum "$file" > "$file.sha256"
   else
-    echo "File $file does not exist, skipping signing."
+    echo "⚠️ Skipping non-file: $file"
   fi
 done
 
-# Gather asset files.
-assets=()
-for file in target/debian/fin_*_amd64.deb target/fin-*-arch.tar.gz target/fin-*-solus.tar.gz target/fin-*-nix.tar.gz; do
-  if [ -f "$file" ]; then
-    assets+=("$file")
-  fi
-done
-if [ ${#assets[@]} -eq 0 ]; then
-  for file in target/package/fin-*; do
-    if [ -f "$file" ]; then
-      assets+=("$file")
-    fi
-  done
-fi
+echo "✅ Finished signing assets."
 
-# Ensure the tag exists locally and push it if necessary.
-if git rev-parse "v$new_version" >/dev/null 2>&1; then
-  echo "Tag v$new_version exists locally, pushing tag."
-  git push origin "v$new_version"
+# Create GitHub release using the GitHub API.
+api_url="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases"
+release_payload=$(cat <<EOF
+{
+  "tag_name": "$new_version",
+  "name": "Release $new_version",
+  "body": "Release $new_version",
+  "draft": false,
+  "prerelease": false
+}
+EOF
+)
+
+echo "🚀 Creating GitHub release..."
+release_response=$(curl -s -v --max-time 30 -X POST "$api_url" \
+  -H "Authorization: token $GH_TOKEN" \
+  -H "Accept: application/vnd.github.v3+json" \
+  -d "$release_payload")
+
+echo "🔍 Curl response:"
+echo "$release_response"
+
+if echo "$release_response" | grep -q '"html_url"'; then
+  echo "✅ GitHub release created successfully."
 else
-  echo "Creating new tag v$new_version."
-  git tag "v$new_version"
-  git push origin "v$new_version"
+  echo "❌ Failed to create GitHub release."
+  echo "Response: $release_response"
+  exit 1
 fi
 
-# Create or update the GitHub release.
-if gh release view "v$new_version" >/dev/null 2>&1; then
-  echo "Release v$new_version exists; updating release."
-  gh release edit "v$new_version" --title "Release v$new_version" --notes "Release $new_version"
-else
-  if [ ${#assets[@]} -eq 0 ]; then
-    echo "No assets found. Creating release without assets."
-    gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version"
-  else
-    gh release create "v$new_version" --title "Release v$new_version" --notes "Release $new_version" "${assets[@]}"
-  fi
-fi
-
-echo "=== Release process complete. New version: $new_version ==="
+echo "Release process completed successfully."
