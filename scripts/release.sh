@@ -7,7 +7,7 @@ echo "=== Starting Release Process ==="
 git fetch --tags --force
 
 # Determine new version by reading Cargo.toml and forcing a "v" prefix.
-new_version=$(grep '^version' Cargo.toml | sed -E 's/version *= *"(.*)"/v\1/')
+new_version=$(grep '^version' Cargo.toml | head -n 1 | sed -E 's/version *= *"(.*)"/v\1/' | tr -d '\n')
 if [[ -z "$new_version" ]]; then
   echo "❌ Could not determine new version. Exiting release process."
   exit 1
