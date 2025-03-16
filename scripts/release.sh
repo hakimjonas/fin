@@ -3,7 +3,7 @@ set -euo pipefail
 
 echo "=== Starting Release Process ==="
 
-# Force-fetch tags (to update local tags and avoid conflicts)
+# Force-fetch tags to update local tags and avoid conflicts.
 git fetch --tags --force
 
 # Determine new version by reading Cargo.toml and forcing a "v" prefix.
@@ -30,6 +30,15 @@ REPO_NAME="fin"
 # Optional: Print the Cargo.toml version for debugging.
 echo "Current Cargo.toml version:"
 grep '^version' Cargo.toml
+
+# Ensure the tag exists.
+if ! git rev-parse "$new_version" >/dev/null 2>&1; then
+  echo "Tag $new_version does not exist locally. Creating it..."
+  git tag "$new_version" -m "Release $new_version"
+  git push origin "$new_version"
+else
+  echo "Tag $new_version already exists."
+fi
 
 # Configure GPG: Import your key and set non-interactive mode.
 mkdir -p ~/.gnupg
@@ -58,7 +67,7 @@ echo "✅ Finished signing assets."
 # Create GitHub release.
 api_url="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases"
 
-# Use jq to generate valid JSON payload.
+# Use jq to generate a valid JSON payload.
 release_payload=$(jq -n \
   --arg tag "$new_version" \
   --arg name "Release $new_version" \
@@ -82,11 +91,11 @@ else
   exit 1
 fi
 
-# Parse the upload URL from the release response using jq.
+# Parse the upload URL from the release response.
 upload_url=$(echo "$release_response" | jq -r '.upload_url' | sed 's/{?name,label}//')
 echo "Parsed upload URL: $upload_url"
 
-# List artifact patterns for distro-specific assets.
+# Define artifact patterns for distro-specific assets.
 assets=(
   "target/debian/fin_*.deb"
   "target/fin-*-solus.tar.gz"

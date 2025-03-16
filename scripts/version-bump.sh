@@ -84,13 +84,20 @@ until gh pr view "$bump_branch" --json merged --jq '.merged' | grep -q "true"; d
 done
 echo "✅ Version bump PR merged successfully."
 
-# Ensure we have the latest trunk
+# Ensure we have the latest trunk.
 git checkout trunk
 git pull origin trunk
 
-# Create a new tag for the version
-git tag "v$new_version"
-git push origin "v$new_version"
-echo "✅ Created and pushed tag v$new_version"
+# Create an annotated tag for the new version if it doesn't exist.
+tag="v$new_version"
+if git rev-parse "$tag" >/dev/null 2>&1; then
+  echo "Tag $tag already exists. Skipping tag creation."
+else
+  echo "Creating new tag: $tag"
+  git tag -a "$tag" -m "Release $tag"
+  git push origin "$tag"
+fi
+
+echo "✅ Created and pushed tag $tag"
 
 echo "=== Version bump process complete. New version: $new_version ==="
