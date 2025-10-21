@@ -33,7 +33,10 @@ script = [
     "echo \"Installing default stylesheet...\"",
     "sudo cp \"${ASSETS_DIR}/style.css\" \"${INSTALL_ASSETS_DIR}/style.css\"",
     "echo \"Installing default theme...\"",
-    "sudo cp \"${ASSETS_DIR}/default.toml\" \"${INSTALL_ASSETS_DIR}/themes/default.toml\""
+    "sudo cp \"${ASSETS_DIR}/default.toml\" \"${INSTALL_ASSETS_DIR}/themes/default.toml\"",
+    "echo \"Installing desktop file...\"",
+    "sudo mkdir -p /usr/share/applications",
+    "sudo cp \"${ASSETS_DIR}/fin.desktop\" /usr/share/applications/fin.desktop"
 ]
 
 

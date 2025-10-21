@@ -915,7 +915,7 @@ fn main() -> Result<()> {
     env_logger::init();
 
     let matches = Command::new("fin")
-        .version("0.1.0")
+        .version(env!("CARGO_PKG_VERSION"))
         .about("Finë Application")
         .arg(
             Arg::new("config")

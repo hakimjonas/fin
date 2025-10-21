@@ -49,6 +49,15 @@ jobs:
           keys:
             - cargo-{{ checksum "Cargo.lock" }}
       - run: rustup default stable
+      - run:
+          name: Install cargo-audit
+          command: |
+            if ! cargo audit --version &> /dev/null; then
+              cargo install cargo-audit
+            fi
+      - run:
+          name: Check for security vulnerabilities
+          command: cargo audit
       - run: cargo clippy --all-targets --all-features --tests -- -D warnings
       - run: cargo fmt -- --check
       - save_cache:
