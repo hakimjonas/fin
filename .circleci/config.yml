@@ -102,6 +102,21 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
+      - restore_cache:
+          keys:
+            - cargo-{{ checksum "Cargo.lock" }}
+      - run:
+          name: Install cargo-make
+          command: |
+            if ! command -v cargo-make &> /dev/null; then
+              cargo install cargo-make
+            fi
+      - run:
+          name: Install cargo-deb
+          command: |
+            if ! cargo deb --version &> /dev/null; then
+              cargo install cargo-deb --version 1.42.0
+            fi
       - run:
           name: Run Release Script
           command: ./scripts/release.sh
@@ -109,18 +124,33 @@ jobs:
 workflows:
   build_test_and_bump:
     jobs:
-      - env_check
-      - verify_files
+      - env_check:
+          filters:
+            tags:
+              ignore: /.*/
+      - verify_files:
+          filters:
+            tags:
+              ignore: /.*/
       - lint:
           requires:
             - env_check
             - verify_files
+          filters:
+            tags:
+              ignore: /.*/
       - build:
           requires:
             - lint
+          filters:
+            tags:
+              ignore: /.*/
       - test:
           requires:
             - build
+          filters:
+            tags:
+              ignore: /.*/
       - bump:
           requires:
             - test
@@ -133,7 +163,48 @@ workflows:
 
   release_on_tag:
     jobs:
-      - release:
+      - env_check:
           filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
+      - verify_files:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
+      - lint:
+          requires:
+            - env_check
+            - verify_files
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
+      - build:
+          requires:
+            - lint
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
+      - test:
+          requires:
+            - build
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
+      - release:
+          requires:
+            - test
+          filters:
+            branches:
+              ignore: /.*/
             tags:
               only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
