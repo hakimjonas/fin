@@ -46,7 +46,7 @@ Finë requires the following runtime dependencies to be installed on your system
 - **Build essentials**: Compiler and build tools
   - Debian/Ubuntu: `build-essential`
   - Arch Linux: `base-devel`
-  - Solus: `system.devel`
+  - Solus: `gcc`, `make`, `pkgconf`
   - Fedora/RHEL: `gcc`
 - **cargo-make**: Rust task runner (optional, for using `cargo make install`)
   - Install via: `cargo install cargo-make`
