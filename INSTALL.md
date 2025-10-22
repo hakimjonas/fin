@@ -32,15 +32,21 @@ Finë requires the following runtime dependencies to be installed on your system
 ### Build Dependencies (Only for manual compilation)
 
 - **Rust** (>= 1.70): Install via [rustup](https://rustup.rs/)
-- **GTK4 development files**:
-  - Debian/Ubuntu: `libgtk-4-dev`
-  - Arch Linux: `gtk4` (includes development files)
-  - Solus: `gtk4-devel`
-  - Fedora/RHEL: `gtk4-devel`
+- **GTK4 and related development files**:
+  - Debian/Ubuntu: `libgtk-4-dev`, `libgdk-pixbuf-2.0-dev`, `libgraphene-1.0-dev`
+  - Arch Linux: `gtk4`, `gdk-pixbuf2`, `graphene` (includes development files)
+  - Solus: `gtk4-devel`, `gdk-pixbuf-devel`, `graphene-devel`
+  - Fedora/RHEL: `gtk4-devel`, `gdk-pixbuf2-devel`, `graphene-devel`
 - **pkg-config**: Build tool for finding libraries
   - Debian/Ubuntu: `pkg-config`
   - Arch Linux: `pkgconf`
   - Solus: `pkgconfig`
+  - Fedora/RHEL: `pkg-config`
+- **Build essentials**: Compiler and build tools
+  - Debian/Ubuntu: `build-essential`
+  - Arch Linux: `base-devel`
+  - Solus: included in system-devel component
+  - Fedora/RHEL: `gcc`
 - **cargo-make**: Rust task runner (optional, for using `cargo make install`)
   - Install via: `cargo install cargo-make`
 
@@ -110,23 +116,23 @@ First, install the required dependencies for your distribution:
 **Debian/Ubuntu:**
 ```sh
 sudo apt-get update
-sudo apt-get install -y libgtk-4-dev pkg-config build-essential
+sudo apt-get install -y libgtk-4-dev libgdk-pixbuf-2.0-dev libgraphene-1.0-dev pkg-config build-essential
 ```
 
 **Arch Linux:**
 ```sh
-sudo pacman -Syu --noconfirm gtk4 base-devel pkgconf
+sudo pacman -Syu --noconfirm gtk4 gdk-pixbuf2 graphene base-devel pkgconf
 ```
 
 **Solus:**
 ```sh
 sudo eopkg up
-sudo eopkg install -y gtk4-devel
+sudo eopkg install -y gtk4-devel gdk-pixbuf-devel graphene-devel
 ```
 
 **Fedora/RHEL:**
 ```sh
-sudo dnf install -y gtk4-devel pkg-config gcc
+sudo dnf install -y gtk4-devel gdk-pixbuf2-devel graphene-devel pkg-config gcc
 ```
 
 #### 2. Install Rust (if not already installed)
