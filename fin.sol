@@ -10,7 +10,11 @@
   <Group>Utility</Group>
   <URL>https://github.com/hakimjonas/fin</URL>
   <Icon>/usr/share/icons/fin.png</Icon>
-  <Depends>gtk4</Depends>
+  <RuntimeDependencies>
+    <Dependency>gtk4</Dependency>
+    <Dependency>glib2</Dependency>
+    <Dependency>shared-mime-info</Dependency>
+  </RuntimeDependencies>
   <Install>
     <Copy from="target/release/fin" to="/usr/local/bin/fin" mode="755"/>
     <Copy from="assets/config.toml" to="/usr/share/fin/config.toml" mode="644"/>

@@ -57,7 +57,7 @@ script = [
 description = "Install dependencies on Ubuntu"
 script = [
     "sudo apt-get update",
-    "sudo apt-get install -y libgtk-4-dev"
+    "sudo apt-get install -y libgtk-4-dev pkg-config build-essential"
 ]
 
 [tasks.install-dependencies-arch]
@@ -69,8 +69,14 @@ script = [
 [tasks.install-dependencies-solus]
 description = "Install dependencies on Solus"
 script = [
-    "sudo eopkg upgrade",
-    "sudo eopkg install -y libgtk-4-devel"
+    "sudo eopkg up",
+    "sudo eopkg install -y gtk4-devel"
+]
+
+[tasks.install-dependencies-fedora]
+description = "Install dependencies on Fedora/RHEL"
+script = [
+    "sudo dnf install -y gtk4-devel pkg-config gcc"
 ]
 
 [tasks.install-dependencies]
@@ -88,8 +94,12 @@ script = [
     "    solus)",
     "      cargo make install-dependencies-solus",
     "      ;;",
+    "    fedora|rhel|centos)",
+    "      cargo make install-dependencies-fedora",
+    "      ;;",
     "    *)",
     "      echo \"Unsupported distribution: $ID\" >&2",
+    "      echo \"Please install GTK4 development libraries manually.\" >&2",
     "      exit 1",
     "      ;;",
     "  esac",
