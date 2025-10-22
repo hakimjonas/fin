@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(cargo:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(cloc:*)",
+      "Bash(find:*)",
+      "Bash(./target/release/fin:*)",
+      "Bash(desktop-file-validate:*)",
+      "Bash(gh run list:*)",
+      "WebSearch",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

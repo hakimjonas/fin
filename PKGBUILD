@@ -6,7 +6,10 @@ pkgdesc="Finë: a simple GTK4-based session controller for Linux desktops"
 arch=('x86_64')
 url="https://github.com/hakimjonas/fin"
 license=('MIT')
-depends=('gtk4')
+depends=('gtk4' 'shared-mime-info')
+optdepends=('adwaita-icon-theme: Default icon theme'
+            'gst-plugins-base: Media playback support'
+            'gst-plugins-good: Additional media format support')
 makedepends=('cargo' 'rust' 'git')
 # Download the source tarball from GitHub.
 source=("$pkgname-$pkgver.tar.gz::https://github.com/hakimjonas/fin/archive/refs/tags/v$pkgver.tar.gz")
