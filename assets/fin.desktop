@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Finë
+GenericName=Session Controller
+Comment=Simple GTK4-based session controller for lock, logout, reboot, and shutdown
+Exec=fin
+Icon=system-shutdown
+Terminal=false
+Type=Application
+Categories=System;
+Keywords=logout;shutdown;reboot;lock;session;power;
+NoDisplay=false

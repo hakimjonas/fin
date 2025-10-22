@@ -76,15 +76,15 @@ git push origin "$bump_branch"
 pr_url=$(gh pr create --fill --base trunk --head "$bump_branch" --title "Version bump to $new_version" --body "Automatic version bump")
 echo "Created bump PR: $pr_url"
 
-# Wait for PR to be merged.
+# Wait for PR to be merged using the "state" field.
 echo "Waiting for PR to be merged..."
-until gh pr view "$bump_branch" --json merged --jq '.merged' | grep -q "true"; do
+until [ "$(gh pr view "$bump_branch" --json state --jq '.state')" = "MERGED" ]; do
   echo "🔄 PR not merged yet, retrying in 10 seconds..."
   sleep 10
 done
 echo "✅ Version bump PR merged successfully."
 
-# Ensure we have the latest trunk.
+# Ensure we have the latest trunk
 git checkout trunk
 git pull origin trunk
 

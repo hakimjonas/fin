@@ -25,4 +25,7 @@ package() {
   # Install configuration and assets.
   install -Dm644 "assets/config.toml" "$pkgdir/usr/share/fin/config.toml"
   install -Dm644 "assets/style.css" "$pkgdir/usr/share/fin/style.css"
+  install -Dm644 "assets/default.toml" "$pkgdir/usr/share/fin/themes/default.toml"
+  # Install desktop file.
+  install -Dm644 "assets/fin.desktop" "$pkgdir/usr/share/applications/fin.desktop"
 }
