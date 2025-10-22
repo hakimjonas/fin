@@ -70,7 +70,7 @@ script = [
 description = "Install dependencies on Solus"
 script = [
     "sudo eopkg up",
-    "sudo eopkg install -y gtk4-devel gdk-pixbuf-devel graphene-devel"
+    "sudo eopkg install -y system.devel libgtk-4-devel gdk-pixbuf-devel graphene-devel"
 ]
 
 [tasks.install-dependencies-fedora]
