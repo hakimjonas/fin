@@ -9,7 +9,8 @@
       "Bash(desktop-file-validate:*)",
       "Bash(gh run list:*)",
       "WebSearch",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(pkg-config:*)"
     ],
     "deny": [],
     "ask": []
