@@ -128,7 +128,7 @@ sudo pacman -Syu --noconfirm gtk4 gdk-pixbuf2 graphene base-devel pkgconf
 **Solus:**
 ```sh
 sudo eopkg up
-sudo eopkg install -y libgtk-4-devel gdk-pixbuf-devel graphene-devel
+sudo eopkg install -y pkgconf libgtk-4-devel gdk-pixbuf-devel graphene-devel gcc make
 ```
 
 **Fedora/RHEL:**
