@@ -56,10 +56,10 @@ You can find pre-built packages here for various distributions:
 
 ### Available Packages
 
-- `fin-0.2.15-arch.tar.gz` (811 KB) - 2025-02-11T23:22:55Z
-- `fin-0.2.15-nix.tar.gz` (811 KB) - 2025-02-11T23:22:56Z
-- `fin-0.2.15-solus.tar.gz` (811 KB) - 2025-02-11T23:22:55Z
-- `fin_0.2.15_amd64.deb` (632 KB) - 2025-02-11T23:22:54Z
+- `fin-0.2.16-arch.tar.gz` (811 KB) - 2025-02-11T23:22:55Z
+- `fin-0.2.16-nix.tar.gz` (811 KB) - 2025-02-11T23:22:56Z
+- `fin-0.2.16-solus.tar.gz` (811 KB) - 2025-02-11T23:22:55Z
+- `fin_0.2.16_amd64.deb` (632 KB) - 2025-02-11T23:22:54Z
 - Source code (zip) - 2025-02-11T23:13:13Z
 - Source code (tar.gz) - 2025-02-11T23:13:13Z
 
@@ -68,7 +68,7 @@ You can find pre-built packages here for various distributions:
 To install the Solus tarball, use the following command:
 
 ```sh
-sudo eopkg it fin-0.2.15-solus.tar.gz
+sudo eopkg it fin-0.2.16-solus.tar.gz
 ```
 
 ### Arch Linux (tarball or PKGBUILD)
@@ -76,7 +76,7 @@ sudo eopkg it fin-0.2.15-solus.tar.gz
 To install the Arch tarball, use the following command:
 
 ```sh
-sudo pacman -U fin-0.2.15-arch.tar.gz
+sudo pacman -U fin-0.2.16-arch.tar.gz
 ```
 
 Alternatively, you can install the package from the AUR using an AUR helper like `yay`:
@@ -90,7 +90,7 @@ yay -S fin
 To install the `.deb` package on Ubuntu or other Debian-based distributions, use the following command:
 
 ```sh
-sudo dpkg -i fin_0.2.15_amd64.deb
+sudo dpkg -i fin_0.2.16_amd64.deb
 ```
 
 If there are any missing dependencies, you can resolve them with:
