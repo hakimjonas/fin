@@ -41,6 +41,7 @@ Finë requires the following runtime dependencies to be installed on your system
 - **pkg-config**: Build tool for finding libraries
   - Debian/Ubuntu: `pkg-config`
   - Arch Linux: `pkgconf`
+  - Solus: `pkgconfig`
   - Fedora/RHEL: `pkg-config`
 - **Build essentials**: Compiler and build tools
   - Debian/Ubuntu: `build-essential`
@@ -127,7 +128,7 @@ sudo pacman -Syu --noconfirm gtk4 gdk-pixbuf2 graphene base-devel pkgconf
 **Solus:**
 ```sh
 sudo eopkg up
-sudo eopkg install -y libgtk-4-devel gdk-pixbuf-devel graphene-devel pango-devel gcc make
+sudo eopkg install -y pkgconfig libgtk-4-devel gdk-pixbuf-devel graphene-devel pango-devel gcc make
 ```
 
 **Fedora/RHEL:**
