@@ -1,5 +1,15 @@
 ## [0.2.16] - 2025-10-22
 
+### Fixed
+- **Build Dependencies**: Added explicit build dependencies for gdk-pixbuf and graphene
+  - Updated Makefile.toml with complete dependency installation for all supported distributions
+  - Updated INSTALL.md with comprehensive build dependency documentation
+  - Fixed missing pkg-config files (gdk-pixbuf-2.0.pc, graphene-gobject-1.0.pc) that caused build failures on fresh systems
+  - Debian/Ubuntu: Now explicitly installs `libgdk-pixbuf-2.0-dev` and `libgraphene-1.0-dev`
+  - Arch Linux: Now explicitly installs `gdk-pixbuf2` and `graphene`
+  - Solus: Now explicitly installs `gdk-pixbuf-devel` and `graphene-devel`
+  - Fedora/RHEL: Now explicitly installs `gdk-pixbuf2-devel` and `graphene-devel`
+
 ## [0.2.15] - 2025-10-22
 
 ## [0.2.14] - 2025-03-17

@@ -57,26 +57,26 @@ script = [
 description = "Install dependencies on Ubuntu"
 script = [
     "sudo apt-get update",
-    "sudo apt-get install -y libgtk-4-dev pkg-config build-essential"
+    "sudo apt-get install -y libgtk-4-dev libgdk-pixbuf-2.0-dev libgraphene-1.0-dev pkg-config build-essential"
 ]
 
 [tasks.install-dependencies-arch]
 description = "Install dependencies on Arch Linux"
 script = [
-    "sudo pacman -Syu --noconfirm gtk4 base-devel pkgconf"
+    "sudo pacman -Syu --noconfirm gtk4 gdk-pixbuf2 graphene base-devel pkgconf"
 ]
 
 [tasks.install-dependencies-solus]
 description = "Install dependencies on Solus"
 script = [
     "sudo eopkg up",
-    "sudo eopkg install -y gtk4-devel"
+    "sudo eopkg install -y pkg-config libgtk-4-devel gdk-pixbuf-devel graphene-devel gcc make"
 ]
 
 [tasks.install-dependencies-fedora]
 description = "Install dependencies on Fedora/RHEL"
 script = [
-    "sudo dnf install -y gtk4-devel pkg-config gcc"
+    "sudo dnf install -y gtk4-devel gdk-pixbuf2-devel graphene-devel pkg-config gcc"
 ]
 
 [tasks.install-dependencies]
