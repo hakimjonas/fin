@@ -1,0 +1,9 @@
+FROM gzgavinzhao/solus:latest
+
+# Update repository
+RUN eopkg update-repo
+
+# Install required packages (no system upgrade needed if image is recent)
+RUN eopkg install -y pkg-config libgtk-4-devel gdk-pixbuf-devel graphene-devel gcc make
+
+CMD ["/bin/bash"]

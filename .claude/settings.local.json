@@ -9,7 +9,14 @@
       "Bash(desktop-file-validate:*)",
       "Bash(gh run list:*)",
       "WebSearch",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(pkg-config:*)",
+      "Bash(docker run:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr close:*)",
+      "Bash(docker build:*)",
+      "Bash(docker search:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
