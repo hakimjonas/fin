@@ -4,6 +4,6 @@ FROM gzgavinzhao/solus:latest
 RUN eopkg update-repo
 
 # Install required packages (no system upgrade needed if image is recent)
-RUN eopkg install -y pkgconfig libgtk-4-devel gdk-pixbuf-devel graphene-devel pango-devel gcc make
+RUN eopkg install -y pkgconf libgtk-4-devel gdk-pixbuf-devel graphene-devel pango-devel gcc make
 
 CMD ["/bin/bash"]
