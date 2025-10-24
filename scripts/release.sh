@@ -48,18 +48,26 @@ echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
 
 # Build and package.
 cargo build --release
-cargo package --allow-dirty
 cargo make package
 
-# Sign release assets – only process regular files.
-for file in target/package/fin-*; do
-  if [[ -f "$file" ]]; then
-    echo "🔑 Signing file: $file"
-    gpg --batch --yes --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" --detach-sign --armor "$file"
-    sha256sum "$file" > "$file.sha256"
-  else
-    echo "⚠️ Skipping non-file: $file"
-  fi
+# Sign release assets – sign the actual distribution packages
+sign_files=(
+  target/debian/fin_*.deb
+  target/fin-*-solus.tar.gz
+  target/fin-*-arch.tar.gz
+  target/fin-*-nix.tar.gz
+)
+
+for pattern in "${sign_files[@]}"; do
+  for file in $pattern; do
+    if [[ -f "$file" ]]; then
+      echo "🔑 Signing file: $file"
+      gpg --batch --yes --pinentry-mode loopback --passphrase "$FINE_SIGNATURE_PASSPHRASE" --detach-sign --armor "$file"
+      sha256sum "$file" > "$file.sha256"
+    else
+      echo "⚠️ No file found for pattern: $pattern"
+    fi
+  done
 done
 
 echo "✅ Finished signing assets."
