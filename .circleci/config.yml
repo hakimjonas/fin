@@ -123,19 +123,15 @@ jobs:
           command: ./scripts/bump-and-release.sh
 
 workflows:
-  # Single workflow: test → bump → release (all in one go)
+  # Run tests on all branches, bump and release only on trunk
   build_test_bump_release:
     jobs:
       - env_check:
           filters:
-            branches:
-              only: trunk
             tags:
               ignore: /.*/
       - verify_files:
           filters:
-            branches:
-              only: trunk
             tags:
               ignore: /.*/
       - lint:
@@ -143,24 +139,18 @@ workflows:
             - env_check
             - verify_files
           filters:
-            branches:
-              only: trunk
             tags:
               ignore: /.*/
       - build:
           requires:
             - lint
           filters:
-            branches:
-              only: trunk
             tags:
               ignore: /.*/
       - test:
           requires:
             - build
           filters:
-            branches:
-              only: trunk
             tags:
               ignore: /.*/
       - bump_and_release:
