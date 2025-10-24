@@ -1,6 +1,6 @@
 [package]
 name = "fin"
-version = "0.2.17"
+version = "0.2.19"
 edition = "2021"
 description = "Finë is a simple, GTK4-based session controller for Linux desktops."
 license = "MIT"
@@ -34,7 +34,7 @@ strip = "symbols"
 # The RPM package name (if different from your crate name)
 package = "fin"
 # Version
-version = "0.2.17"
+version = "0.2.19"
 
 # RPM package release number
 release = "1"
