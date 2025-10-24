@@ -70,11 +70,36 @@ if git diff --cached --quiet; then
 fi
 
 git commit -m "Bump version to $new_version"
-git push origin "$bump_branch"
 
-# Create a PR using GitHub CLI.
-pr_url=$(gh pr create --fill --base trunk --head "$bump_branch" --title "Version bump to $new_version" --body "Automatic version bump")
-echo "Created bump PR: $pr_url"
+# Push to remote, handling case where branch already exists
+if git push origin "$bump_branch" 2>&1; then
+  echo "✅ Successfully pushed branch $bump_branch"
+else
+  echo "⚠️  Push failed, checking if remote branch already exists..."
+  if git ls-remote --heads origin "$bump_branch" | grep -q "$bump_branch"; then
+    echo "✅ Branch $bump_branch already exists on remote, checking if it's identical..."
+    git fetch origin "$bump_branch"
+    if git diff --quiet HEAD "origin/$bump_branch"; then
+      echo "✅ Remote branch is identical to local changes. Continuing..."
+    else
+      echo "⚠️  Remote branch exists but differs from local. Attempting force push..."
+      git push --force origin "$bump_branch"
+    fi
+  else
+    echo "❌ Push failed for unknown reason"
+    exit 1
+  fi
+fi
+
+# Create a PR using GitHub CLI, or skip if it already exists.
+if gh pr view "$bump_branch" --json number >/dev/null 2>&1; then
+  echo "✅ PR already exists for $bump_branch"
+  pr_url=$(gh pr view "$bump_branch" --json url --jq '.url')
+  echo "Existing PR: $pr_url"
+else
+  pr_url=$(gh pr create --fill --base trunk --head "$bump_branch" --title "Version bump to $new_version" --body "Automatic version bump")
+  echo "Created bump PR: $pr_url"
+fi
 
 # Wait for PR to be merged using the "state" field.
 echo "Waiting for PR to be merged..."
