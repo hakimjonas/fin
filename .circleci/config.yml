@@ -97,15 +97,7 @@ jobs:
           paths:
             - target/release/fin
 
-  bump:
-    executor: fin-deb-build
-    steps:
-      - checkout
-      - run:
-          name: Trigger Version Bump
-          command: ./scripts/version-bump.sh
-
-  release:
+  bump_and_release:
     executor: fin-deb-build
     steps:
       - checkout
@@ -127,11 +119,12 @@ jobs:
               cargo install cargo-deb --version 1.42.0
             fi
       - run:
-          name: Run Release Script
-          command: ./scripts/release.sh
+          name: Bump Version and Release
+          command: ./scripts/bump-and-release.sh
 
 workflows:
-  build_test_and_bump:
+  # Run tests on all branches, bump and release only on trunk
+  build_test_bump_release:
     jobs:
       - env_check:
           filters:
@@ -160,60 +153,11 @@ workflows:
           filters:
             tags:
               ignore: /.*/
-      - bump:
+      - bump_and_release:
           requires:
             - test
           filters:
             branches:
               only: trunk
-              ignore: /^version-bump-.*/
             tags:
               ignore: /.*/
-
-  release_on_tag:
-    jobs:
-      - env_check:
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
-      - verify_files:
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
-      - lint:
-          requires:
-            - env_check
-            - verify_files
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
-      - build:
-          requires:
-            - lint
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
-      - test:
-          requires:
-            - build
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
-      - release:
-          requires:
-            - test
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
