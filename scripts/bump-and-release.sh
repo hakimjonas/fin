@@ -55,7 +55,7 @@ git config user.name "CI Bot"
 # Commit version bump directly to trunk
 git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md Cargo.lock
 git commit -m "Bump version to $new_version"
-git push origin trunk
+git push origin HEAD:refs/heads/trunk
 
 echo "✅ Version bumped to $new_version and pushed to trunk"
 
