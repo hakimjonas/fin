@@ -161,3 +161,4 @@ workflows:
               only: trunk
             tags:
               ignore: /.*/
+
