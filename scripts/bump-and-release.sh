@@ -41,6 +41,10 @@ sed -i "s|<Version>[^<]*</Version>|<Version>$new_version</Version>|" fin.sol
 sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
 sed -i "s/$current_version/$new_version/g" INSTALL.md
 
+# Update Cargo.lock with new version
+echo "Updating Cargo.lock..."
+cargo update -p fin
+
 # Update CHANGELOG
 if grep -q "^## \[Unreleased\]" CHANGELOG.md; then
   sed -i "s/^## \[Unreleased\]/## [$new_version] - $(date +%Y-%m-%d)/" CHANGELOG.md
