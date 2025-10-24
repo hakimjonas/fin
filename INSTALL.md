@@ -162,8 +162,9 @@ cargo make install
 # Build the release binary
 cargo build --release
 
-# Install the binary
-sudo install -Dm755 target/release/fin /usr/local/bin/fin
+# Install the binary to /usr/bin (system-wide, for all users)
+# Note: Use /usr/bin for system-wide installation
+sudo install -Dm755 target/release/fin /usr/bin/fin
 
 # Install configuration and assets
 sudo install -Dm644 assets/config.toml /usr/share/fin/config.toml

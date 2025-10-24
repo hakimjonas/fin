@@ -3,7 +3,7 @@ export = ["CARGO_MANIFEST_DIR", "PROJECT_ROOT", "ASSETS_DIR", "VERSION"]
 PROJECT_ROOT = "${CARGO_MAKE_WORKING_DIRECTORY}"
 ASSETS_DIR = "${PROJECT_ROOT}/assets"
 INSTALL_ASSETS_DIR = "/usr/share/fin"
-INSTALL_BIN_DIR = "/usr/local/bin"
+INSTALL_BIN_DIR = "/usr/bin"
 VERSION = "${CARGO_MAKE_CRATE_VERSION}"
 
 [tasks.install-cargo-make]
@@ -153,9 +153,13 @@ description = "Package Finë for Solus as a tarball (including Solus manifest if
 script = [
     "echo \"Packaging for Solus...\"",
     "rm -rf target/package/solus",
-    "mkdir -p target/package/solus/usr/local/bin target/package/solus/usr/share/fin",
-    "cp target/release/fin target/package/solus/usr/local/bin/",
-    "cp -r assets target/package/solus/usr/share/fin/",
+    "mkdir -p target/package/solus/usr/bin target/package/solus/usr/share/fin target/package/solus/usr/share/applications",
+    "cp target/release/fin target/package/solus/usr/bin/",
+    "cp assets/config.toml target/package/solus/usr/share/fin/",
+    "cp assets/style.css target/package/solus/usr/share/fin/",
+    "mkdir -p target/package/solus/usr/share/fin/themes",
+    "cp assets/default.toml target/package/solus/usr/share/fin/themes/",
+    "cp assets/fin.desktop target/package/solus/usr/share/applications/",
     "if [ -f fin.sol ]; then cp fin.sol target/package/solus/; else echo \"Warning: No Solus manifest (fin.sol) found.\"; fi",
     "tar -czvf target/fin-${VERSION}-solus.tar.gz -C target/package/solus .",
     "echo \"Solus package created: target/fin-${VERSION}-solus.tar.gz\""

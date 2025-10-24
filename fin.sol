@@ -16,7 +16,7 @@
     <Dependency>shared-mime-info</Dependency>
   </RuntimeDependencies>
   <Install>
-    <Copy from="target/release/fin" to="/usr/local/bin/fin" mode="755"/>
+    <Copy from="target/release/fin" to="/usr/bin/fin" mode="755"/>
     <Copy from="assets/config.toml" to="/usr/share/fin/config.toml" mode="644"/>
     <Copy from="assets/style.css" to="/usr/share/fin/style.css" mode="644"/>
     <Copy from="assets/default.toml" to="/usr/share/fin/themes/default.toml" mode="644"/>
