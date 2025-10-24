@@ -14,7 +14,7 @@
       {
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "fin";
-  version = "0.2.20";
+  version = "0.2.21";
           src = ./.;
           cargoSha256 = "03ik4z1c7kf7ml0gb5as21wdmcvxbcg82migk0i4sssx9wrj2nvf";
           buildInputs = [ pkgs.gtk4 ];
