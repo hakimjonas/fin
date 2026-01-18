@@ -1,4 +1,4 @@
-FROM ubuntu:24.10
+FROM ubuntu:25.04
 
 # Install system dependencies and GitHub CLI dependencies
 RUN apt-get update && apt-get install -y \

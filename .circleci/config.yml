@@ -57,9 +57,7 @@ jobs:
             fi
       - run:
           name: Check for security vulnerabilities
-          # Allow audit to fail due to CVSS 4.0 parsing issues in advisory-db
-          # See: https://github.com/rustsec/rustsec/issues/1194
-          command: cargo audit || echo "⚠️ cargo audit failed (may be advisory-db parsing issue)"
+          command: cargo audit
       - run: cargo clippy --all-targets --all-features --tests -- -D warnings
       - run: cargo fmt -- --check
       - save_cache:
