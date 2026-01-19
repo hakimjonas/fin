@@ -240,9 +240,12 @@ jobs:
             # Create output directory for .stone packages
             mkdir -p stone-output
 
-            # Run boulder build (--output specifies where .stone files are written)
-            # Use verbose mode to get more error details
-            boulder \
+            # Run boulder build with unconfined AppArmor profile
+            # Ubuntu 24.04 has AppArmor restrictions on user namespace operations
+            # that block mount(MS_PRIVATE) inside user namespaces
+            # See: https://discourse.ubuntu.com/t/understanding-apparmor-user-namespace-restriction/58007
+            aa-exec --profile=unconfined -- \
+              boulder \
               --verbose \
               --data-dir="$HOME/.local/share/boulder/" \
               --config-dir="$HOME/.config/boulder/" \
@@ -255,10 +258,6 @@ jobs:
                 sudo dmesg | tail -50 || true
                 echo "=== AppArmor denials ==="
                 sudo dmesg | grep -i apparmor | tail -20 || true
-                echo "=== audit.log ==="
-                sudo cat /var/log/audit/audit.log 2>/dev/null | tail -30 || echo "No audit.log"
-                echo "=== syslog apparmor ==="
-                sudo grep -i apparmor /var/log/syslog 2>/dev/null | tail -20 || echo "No apparmor in syslog"
                 exit 1
               }
 
