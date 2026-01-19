@@ -41,6 +41,10 @@ sed -i "s|<Version>[^<]*</Version>|<Version>$new_version</Version>|" fin.sol
 sed -i "s/^[[:space:]]*version *= *\"[^\"]*\";/  version = \"$new_version\";/" flake.nix
 sed -i "s/$current_version/$new_version/g" INSTALL.md
 
+# Update AerynOS stone.yaml
+sed -i "s/^version[[:space:]]*:[[:space:]]*.*/version     : $new_version/" packaging/aeryn/stone.yaml
+sed -i "s#git|https://github.com/hakimjonas/fin.git : v[0-9.]*#git|https://github.com/hakimjonas/fin.git : v$new_version#" packaging/aeryn/stone.yaml
+
 # Update Cargo.lock with new version
 echo "Updating Cargo.lock..."
 cargo update -p fin
@@ -57,7 +61,7 @@ git config user.email "ci-bot@example.com"
 git config user.name "CI Bot"
 
 # Commit version bump directly to trunk
-git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md Cargo.lock
+git add Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md Cargo.lock packaging/aeryn/stone.yaml
 git commit -m "Bump version to $new_version [skip ci]"
 git push origin HEAD:refs/heads/trunk
 
