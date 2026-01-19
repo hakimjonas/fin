@@ -133,6 +133,12 @@ jobs:
           command: |
             git fetch origin trunk
             git checkout origin/trunk
+      - restore_cache:
+          keys:
+            - rust-toolchain-v1-{{ arch }}
+      - restore_cache:
+          keys:
+            - boulder-build-v1-{{ arch }}
       - run:
           name: Install system dependencies
           command: |
@@ -141,15 +147,24 @@ jobs:
       - run:
           name: Install Rust
           command: |
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-            echo 'source $HOME/.cargo/env' >> ~/.bashrc
-            source $HOME/.cargo/env
-            rustup default stable
+            if [ -d "$HOME/.cargo" ] && [ -d "$HOME/.rustup" ]; then
+              echo "Rust already installed from cache"
+              source $HOME/.cargo/env
+              rustc --version
+            else
+              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+              source $HOME/.cargo/env
+              rustup default stable
+            fi
       - run:
           name: Install just
           command: |
             source $HOME/.cargo/env
-            cargo install just
+            if command -v just &> /dev/null; then
+              echo "just already installed from cache"
+            else
+              cargo install just
+            fi
       - run:
           name: Configure user namespaces
           command: |
@@ -161,24 +176,34 @@ jobs:
           name: Build boulder from source
           command: |
             source $HOME/.cargo/env
-            git clone --depth 1 https://github.com/AerynOS/os-tools.git /tmp/os-tools
-            cd /tmp/os-tools
 
-            # Build boulder binary
-            just boulder
+            # Check if boulder is already cached
+            if [ -x "$HOME/.local/bin/boulder" ]; then
+              echo "Boulder already installed from cache"
+              ~/.local/bin/boulder --version
+            else
+              git clone --depth 1 https://github.com/AerynOS/os-tools.git /tmp/os-tools
+              cd /tmp/os-tools
 
-            # Install boulder binary
-            mkdir -p ~/.local/bin
-            cp target/onboarding/boulder ~/.local/bin/
+              # Build boulder binary
+              just boulder
 
-            # Install boulder data files (macros, profiles)
-            # Note: SPDX licenses only needed for recipe drafting, not building
-            mkdir -p ~/.local/share/boulder
-            cp -r boulder/data/* ~/.local/share/boulder/
+              # Install boulder binary
+              mkdir -p ~/.local/bin
+              cp target/onboarding/boulder ~/.local/bin/
 
-            # Verify installation
-            echo "Boulder installed:"
-            ~/.local/bin/boulder --version
+              # Install boulder data files (macros go to data dir)
+              mkdir -p ~/.local/share/boulder
+              cp -r boulder/data/macros ~/.local/share/boulder/
+
+              # Install profiles to config dir
+              mkdir -p ~/.config/boulder/profile.d
+              cp boulder/data/profile.d/*.yaml ~/.config/boulder/profile.d/
+
+              echo "Boulder installed:"
+              ~/.local/bin/boulder --version
+            fi
+
             echo "Data directory:"
             ls -la ~/.local/share/boulder/
       - run:
@@ -240,6 +265,17 @@ jobs:
             done
 
             echo "✅ .stone packages uploaded"
+      - save_cache:
+          key: rust-toolchain-v1-{{ arch }}
+          paths:
+            - ~/.cargo
+            - ~/.rustup
+      - save_cache:
+          key: boulder-build-v1-{{ arch }}
+          paths:
+            - ~/.local/bin/boulder
+            - ~/.local/share/boulder
+            - ~/.config/boulder
 
 workflows:
   # Run tests on all branches, bump and release only on trunk
