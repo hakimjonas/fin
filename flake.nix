@@ -14,11 +14,22 @@
       {
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "fin";
-  version = "0.2.22";
+          version = "0.2.22";
           src = ./.;
-          cargoSha256 = "03ik4z1c7kf7ml0gb5as21wdmcvxbcg82migk0i4sssx9wrj2nvf";
+
+          # Use Cargo.lock directly instead of manual hash management
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
+
           buildInputs = [ pkgs.gtk4 ];
-          nativeBuildInputs = [ pkgs.pkg-config ];
+
+          nativeBuildInputs = [
+            pkgs.pkg-config
+            # Required for GTK4 apps: wraps binary to set GSettings schemas,
+            # GIO modules, and other GTK environment variables
+            pkgs.wrapGAppsHook4
+          ];
 
           postInstall = ''
             install -Dm644 assets/config.toml $out/share/fin/config.toml
@@ -34,6 +45,36 @@
             maintainers = [ maintainers.hakimjonas ];
             platforms = platforms.linux;
           };
+        };
+
+        # Development shell with all build dependencies
+        devShells.default = pkgs.mkShell {
+          name = "fin-dev";
+
+          buildInputs = [
+            pkgs.gtk4
+          ];
+
+          nativeBuildInputs = [
+            # Rust toolchain
+            pkgs.rustc
+            pkgs.cargo
+            pkgs.clippy
+            pkgs.rustfmt
+
+            # Build dependencies
+            pkgs.pkg-config
+
+            # GTK4 introspection and development
+            pkgs.wrapGAppsHook4
+          ];
+
+          # Ensure GTK can find schemas during development
+          shellHook = ''
+            echo "Finë development environment"
+            echo "Rust: $(rustc --version)"
+            echo "Cargo: $(cargo --version)"
+          '';
         };
       });
 }

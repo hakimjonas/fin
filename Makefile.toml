@@ -191,6 +191,20 @@ script = [
     "echo \"Nix package created: target/fin-${VERSION}-nix.tar.gz\""
 ]
 
+[tasks.package-nix-check]
+description = "Verify the Nix flake is valid and builds correctly"
+script = [
+    "echo \"Checking Nix flake...\"",
+    "if ! command -v nix &> /dev/null; then",
+    "  echo \"Error: nix is not installed\" >&2",
+    "  exit 1",
+    "fi",
+    "nix flake check --no-build",
+    "echo \"Flake check passed. Running build...\"",
+    "nix build --print-build-logs",
+    "echo \"Nix build successful: $(readlink -f result)\""
+]
+
 [tasks.package]
 description = "Package Finë for distribution (Debian, Solus, Arch, and Nix)"
 dependencies = [
