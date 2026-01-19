@@ -168,22 +168,31 @@ jobs:
       - run:
           name: Configure user namespaces
           command: |
-            # Ubuntu 24.04 has AppArmor restrictions that block user namespace mount operations
-            # Disable AppArmor for boulder's containerized builds
-            # See: https://discourse.ubuntu.com/t/understanding-apparmor-user-namespace-restriction/58007
-            echo "Disabling AppArmor restrictions..."
-            sudo aa-teardown 2>/dev/null || sudo systemctl stop apparmor 2>/dev/null || echo "AppArmor not running or cannot be stopped"
+            echo "=== System Info ==="
+            uname -a
+            cat /etc/os-release | head -5
 
-            # Setup subuid/subgid for boulder's containerized builds
+            echo "=== AppArmor Status ==="
+            sudo aa-status 2>/dev/null || echo "aa-status not available"
+            cat /sys/module/apparmor/parameters/enabled 2>/dev/null || echo "AppArmor module status unknown"
+
+            echo "=== User Namespace Settings ==="
+            cat /proc/sys/user/max_user_namespaces 2>/dev/null || echo "max_user_namespaces not found"
+            cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null || echo "unprivileged_userns_clone not found"
+
+            echo "=== Setup subuid/subgid ==="
             sudo touch /etc/subuid /etc/subgid
             sudo usermod --add-subuids 1000000-1065535 --add-subgids 1000000-1065535 root
             sudo usermod --add-subuids 1065536-1131071 --add-subgids 1065536-1131071 $(whoami)
-
-            # Verify configuration
             echo "subuid:"
             cat /etc/subuid
             echo "subgid:"
             cat /etc/subgid
+
+            echo "=== newuidmap/newgidmap ==="
+            which newuidmap newgidmap
+            ls -la /usr/bin/newuidmap /usr/bin/newgidmap
+            getcap /usr/bin/newuidmap /usr/bin/newgidmap 2>/dev/null || echo "getcap not available"
       - run:
           name: Build boulder from source
           command: |
@@ -232,13 +241,26 @@ jobs:
             mkdir -p stone-output
 
             # Run boulder build (--output specifies where .stone files are written)
+            # Use verbose mode to get more error details
             boulder \
+              --verbose \
               --data-dir="$HOME/.local/share/boulder/" \
               --config-dir="$HOME/.config/boulder/" \
               --moss-root="$HOME/.cache/boulder/" \
               build \
               --output=stone-output \
-              packaging/aeryn/stone.yaml
+              packaging/aeryn/stone.yaml || {
+                echo "=== Boulder build failed, capturing diagnostics ==="
+                echo "=== dmesg (last 50 lines) ==="
+                sudo dmesg | tail -50 || true
+                echo "=== AppArmor denials ==="
+                sudo dmesg | grep -i apparmor | tail -20 || true
+                echo "=== audit.log ==="
+                sudo cat /var/log/audit/audit.log 2>/dev/null | tail -30 || echo "No audit.log"
+                echo "=== syslog apparmor ==="
+                sudo grep -i apparmor /var/log/syslog 2>/dev/null | tail -20 || echo "No apparmor in syslog"
+                exit 1
+              }
 
             # List generated .stone files
             echo "Generated .stone packages:"
