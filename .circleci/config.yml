@@ -168,23 +168,21 @@ jobs:
       - run:
           name: Configure user namespaces
           command: |
-            # Enable unprivileged user namespaces (required for boulder's rootless containers)
-            sudo sysctl -w kernel.unprivileged_userns_clone=1 || echo "Setting not available (may already be enabled)"
-
-            # Check current namespace settings
-            echo "User namespace settings:"
-            cat /proc/sys/user/max_user_namespaces || true
-            cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null || echo "unprivileged_userns_clone not present"
+            # Ubuntu 24.04 has AppArmor restrictions that block user namespace mount operations
+            # Disable AppArmor for boulder's containerized builds
+            # See: https://discourse.ubuntu.com/t/understanding-apparmor-user-namespace-restriction/58007
+            echo "Disabling AppArmor restrictions..."
+            sudo aa-teardown 2>/dev/null || sudo systemctl stop apparmor 2>/dev/null || echo "AppArmor not running or cannot be stopped"
 
             # Setup subuid/subgid for boulder's containerized builds
             sudo touch /etc/subuid /etc/subgid
             sudo usermod --add-subuids 1000000-1065535 --add-subgids 1000000-1065535 root
             sudo usermod --add-subuids 1065536-1131071 --add-subgids 1065536-1131071 $(whoami)
 
-            # Verify subuid/subgid
-            echo "subuid config:"
+            # Verify configuration
+            echo "subuid:"
             cat /etc/subuid
-            echo "subgid config:"
+            echo "subgid:"
             cat /etc/subgid
       - run:
           name: Build boulder from source
