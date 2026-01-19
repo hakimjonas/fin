@@ -14,7 +14,7 @@
       {
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = "fin";
-  version = "0.2.26";
+  version = "0.2.27";
           src = ./.;
 
           # Use Cargo.lock directly instead of manual hash management
