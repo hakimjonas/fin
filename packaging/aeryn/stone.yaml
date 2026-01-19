@@ -4,11 +4,11 @@
 # SPDX-License-Identifier: MIT
 #
 name        : fin
-version     : 0.2.25
+version     : 0.2.26
 release     : 1
 homepage    : https://github.com/hakimjonas/fin
 upstreams   :
-    - git|https://github.com/hakimjonas/fin.git : v0.2.25
+    - git|https://github.com/hakimjonas/fin.git : v0.2.26
 summary     : Simple GTK4-based session controller for Linux desktops
 description : |
     Finë is a lightweight, GTK4-based session controller application designed
