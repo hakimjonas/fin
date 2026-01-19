@@ -31,7 +31,7 @@ jobs:
           name: Verify Required Files Exist
           command: |
             set -euo pipefail
-            required_files=(Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md)
+            required_files=(Cargo.toml PKGBUILD fin.sol flake.nix INSTALL.md CHANGELOG.md packaging/aeryn/stone.yaml)
             for file in "${required_files[@]}"; do
               if [ ! -f "$file" ]; then
                 echo "❌ Required file '$file' missing!"
@@ -122,6 +122,125 @@ jobs:
           name: Bump Version and Release
           command: ./scripts/bump-and-release.sh
 
+  build_stone:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    steps:
+      - checkout
+      - run:
+          name: Get latest version from trunk
+          command: |
+            git fetch origin trunk
+            git checkout origin/trunk
+      - run:
+          name: Install system dependencies
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y uidmap curl build-essential pkg-config libgtk-4-dev jq
+      - run:
+          name: Install Rust
+          command: |
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            echo 'source $HOME/.cargo/env' >> ~/.bashrc
+            source $HOME/.cargo/env
+            rustup default stable
+      - run:
+          name: Install just
+          command: |
+            source $HOME/.cargo/env
+            cargo install just
+      - run:
+          name: Configure user namespaces
+          command: |
+            # Setup subuid/subgid for boulder's containerized builds
+            sudo touch /etc/subuid /etc/subgid
+            sudo usermod --add-subuids 1000000-1065535 --add-subgids 1000000-1065535 root
+            sudo usermod --add-subuids 1065536-1131071 --add-subgids 1065536-1131071 $(whoami)
+      - run:
+          name: Build boulder from source
+          command: |
+            source $HOME/.cargo/env
+            git clone --depth 1 https://github.com/AerynOS/os-tools.git /tmp/os-tools
+            cd /tmp/os-tools
+
+            # Build boulder binary
+            just boulder
+
+            # Install boulder binary
+            mkdir -p ~/.local/bin
+            cp target/onboarding/boulder ~/.local/bin/
+
+            # Install boulder data files (macros, profiles)
+            # Note: SPDX licenses only needed for recipe drafting, not building
+            mkdir -p ~/.local/share/boulder
+            cp -r boulder/data/* ~/.local/share/boulder/
+
+            # Verify installation
+            echo "Boulder installed:"
+            ~/.local/bin/boulder --version
+            echo "Data directory:"
+            ls -la ~/.local/share/boulder/
+      - run:
+          name: Build .stone package
+          command: |
+            source $HOME/.cargo/env
+            export PATH="$HOME/.local/bin:$PATH"
+
+            # Get version from Cargo.toml
+            VERSION=$(awk -F'"' '/^version *=/ {print $2; exit}' Cargo.toml)
+            echo "Building .stone for version $VERSION"
+
+            # Create output directory for .stone packages
+            mkdir -p stone-output
+
+            # Run boulder build (--output specifies where .stone files are written)
+            boulder \
+              --data-dir="$HOME/.local/share/boulder/" \
+              --config-dir="$HOME/.config/boulder/" \
+              --moss-root="$HOME/.cache/boulder/" \
+              build \
+              --output=stone-output \
+              packaging/aeryn/stone.yaml
+
+            # List generated .stone files
+            echo "Generated .stone packages:"
+            ls -la stone-output/*.stone
+      - run:
+          name: Upload .stone to GitHub Release
+          command: |
+            VERSION=$(awk -F'"' '/^version *=/ {print $2; exit}' Cargo.toml)
+            TAG="v$VERSION"
+
+            # Find release by tag
+            RELEASE_INFO=$(curl -s \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/hakimjonas/fin/releases/tags/$TAG")
+
+            UPLOAD_URL=$(echo "$RELEASE_INFO" | jq -r '.upload_url' | sed 's/{?name,label}//')
+
+            if [ "$UPLOAD_URL" = "null" ] || [ -z "$UPLOAD_URL" ]; then
+              echo "❌ Could not find release for tag $TAG"
+              exit 1
+            fi
+
+            echo "Found release, uploading .stone packages..."
+
+            # Upload all .stone files from stone-output directory
+            for stone_file in stone-output/*.stone; do
+              if [ -f "$stone_file" ]; then
+                filename=$(basename "$stone_file")
+                echo "Uploading: $filename"
+                curl -s --data-binary @"$stone_file" \
+                  -H "Content-Type: application/octet-stream" \
+                  -H "Authorization: token $GH_TOKEN" \
+                  "$UPLOAD_URL?name=$filename"
+              fi
+            done
+
+            echo "✅ .stone packages uploaded"
+
 workflows:
   # Run tests on all branches, bump and release only on trunk
   build_test_bump_release:
@@ -156,6 +275,14 @@ workflows:
       - bump_and_release:
           requires:
             - test
+          filters:
+            branches:
+              only: trunk
+            tags:
+              ignore: /.*/
+      - build_stone:
+          requires:
+            - bump_and_release
           filters:
             branches:
               only: trunk
