@@ -1,0 +1,41 @@
+#
+# SPDX-FileCopyrightText: © 2024-2026 Hakim Jonas Ghoula
+#
+# SPDX-License-Identifier: MIT
+#
+name        : fin
+version     : 0.2.22
+release     : 1
+homepage    : https://github.com/hakimjonas/fin
+upstreams   :
+    - git|https://github.com/hakimjonas/fin.git : v0.2.22
+summary     : Simple GTK4-based session controller for Linux desktops
+description : |
+    Finë is a lightweight, GTK4-based session controller application designed
+    for Linux desktops. It provides a clean, intuitive interface for managing
+    session-related operations such as locking the screen, logging out,
+    rebooting, and shutting down the system. The name comes from Quenya
+    (J.R.R. Tolkien's fictional language), meaning "end" or "ending."
+license     :
+    - MIT
+networking  : true
+builddeps   :
+    - binary(cargo)
+    - pkgconfig(gtk4)
+    - pkgconfig(glib-2.0)
+setup       : |
+    %cargo_fetch
+build       : |
+    %cargo_build
+install     : |
+    %cargo_install fin
+
+    # Install configuration and assets
+    install -Dm644 assets/config.toml %(installroot)/usr/share/fin/config.toml
+    install -Dm644 assets/style.css %(installroot)/usr/share/fin/style.css
+    install -Dm644 assets/default.toml %(installroot)/usr/share/fin/themes/default.toml
+
+    # Install desktop entry
+    install -Dm644 assets/fin.desktop %(installroot)/usr/share/applications/fin.desktop
+check       : |
+    %cargo_test

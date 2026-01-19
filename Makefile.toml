@@ -205,12 +205,67 @@ script = [
     "echo \"Nix build successful: $(readlink -f result)\""
 ]
 
+[tasks.package-aeryn]
+description = "Package Finë for AerynOS (creates tarball with stone.yaml)"
+script = [
+    "echo \"Packaging for AerynOS...\"",
+    "rm -rf target/package/aeryn",
+    "mkdir -p target/package/aeryn/fin",
+    "cp -r packaging/aeryn/* target/package/aeryn/fin/",
+    "cp -r src target/package/aeryn/fin/",
+    "cp Cargo.toml Cargo.lock target/package/aeryn/fin/",
+    "cp -r assets target/package/aeryn/fin/",
+    "tar -czvf target/fin-${VERSION}-aeryn.tar.gz -C target/package/aeryn fin",
+    "echo \"AerynOS package created: target/fin-${VERSION}-aeryn.tar.gz\"",
+    "echo \"To build with boulder: cargo make package-aeryn-local\""
+]
+
+[tasks.package-aeryn-local]
+description = "Build AerynOS package locally using boulder (requires boulder installed)"
+script = [
+    "echo \"=== AerynOS Local Package Build ===\"",
+    "",
+    "# Check for boulder",
+    "BOULDER_BIN=\"${HOME}/.local/bin/boulder\"",
+    "if [ ! -x \"$BOULDER_BIN\" ]; then",
+    "  echo \"Error: boulder not found at $BOULDER_BIN\" >&2",
+    "  echo \"\" >&2",
+    "  echo \"To install boulder:\" >&2",
+    "  echo \"  git clone https://github.com/AerynOS/os-tools.git\" >&2",
+    "  echo \"  cd os-tools\" >&2",
+    "  echo \"  just get-started\" >&2",
+    "  echo \"\" >&2",
+    "  echo \"Then configure user namespaces:\" >&2",
+    "  echo \"  sudo usermod --add-subuids 1000000-1065535 --add-subgids 1000000-1065535 root\" >&2",
+    "  echo \"  sudo usermod --add-subuids 1065536-1131071 --add-subgids 1065536-1131071 \\$USER\" >&2",
+    "  exit 1",
+    "fi",
+    "",
+    "# Verify stone.yaml exists",
+    "if [ ! -f packaging/aeryn/stone.yaml ]; then",
+    "  echo \"Error: packaging/aeryn/stone.yaml not found\" >&2",
+    "  exit 1",
+    "fi",
+    "",
+    "echo \"Building with boulder...\"",
+    "",
+    "# Run boulder with non-AerynOS configuration",
+    "$BOULDER_BIN \\",
+    "  --data-dir=\"${HOME}/.local/share/boulder/\" \\",
+    "  --config-dir=\"${HOME}/.config/boulder/\" \\",
+    "  --moss-root=\"${HOME}/.cache/boulder/\" \\",
+    "  build packaging/aeryn/stone.yaml",
+    "",
+    "echo \"Build complete. Check current directory for .stone packages.\""
+]
+
 [tasks.package]
-description = "Package Finë for distribution (Debian, Solus, Arch, and Nix)"
+description = "Package Finë for distribution (Debian, Solus, Arch, Nix, and AerynOS)"
 dependencies = [
     "build-release",
     "package-deb",
     "package-solus",
     "package-arch",
-    "package-nix"
+    "package-nix",
+    "package-aeryn"
 ]
