@@ -17,6 +17,7 @@ use log::{error, info, warn};
 use serde::Deserialize;
 use std::cell::Cell;
 use std::env;
+use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
@@ -113,33 +114,52 @@ fn resolve_css_path(config_css: Option<String>, config_path: &Path, default_css:
     }
 }
 
-/// Loads the system-configured CSS file as a fallback.
+/// Loads the system-configured CSS file, falling back to `default_css` if not found.
+///
+/// Attempts to read the CSS path from the system configuration file. If the system
+/// config doesn't exist, can't be parsed, or doesn't specify a CSS path, falls back
+/// to `default_css`.
 ///
 /// # Parameters
-/// - `default_css`: The default CSS file path used for fallback.
+/// - `default_css`: The default CSS file path used as fallback.
 ///
 /// # Returns
-/// An `Option<PathBuf>` with the system CSS file if found.
-fn load_system_css(_default_css: &Path) -> Option<PathBuf> {
+/// An `Option<PathBuf>` with the resolved CSS file, or `None` if neither exists.
+fn load_system_css(default_css: &Path) -> Option<PathBuf> {
     let system_config_path =
         env::var("FIN_SYSTEM_CONFIG").unwrap_or_else(|_| SYSTEM_CONFIG_PATH.to_string());
-    let system_config_content = fs::read_to_string(&system_config_path).ok()?;
-    let system_config: SystemConfig = toml::from_str(&system_config_content).ok()?;
-    let css_str = system_config.css_path?;
-    let system_css_path = Path::new(SYSTEM_CSS_DIR).join(css_str);
-    if system_css_path.exists() {
-        info!(
-            "Using system-configured CSS at '{}'.",
-            system_css_path.display()
-        );
-        Some(system_css_path)
-    } else {
-        warn!(
-            "System-configured CSS '{}' does not exist.",
-            system_css_path.display()
-        );
-        None
-    }
+
+    let system_css = (|| {
+        let system_config_content = fs::read_to_string(&system_config_path).ok()?;
+        let system_config: SystemConfig = toml::from_str(&system_config_content).ok()?;
+        let css_str = system_config.css_path?;
+        let system_css_path = Path::new(SYSTEM_CSS_DIR).join(css_str);
+        if system_css_path.exists() {
+            info!(
+                "Using system-configured CSS at '{}'.",
+                system_css_path.display()
+            );
+            Some(system_css_path)
+        } else {
+            warn!(
+                "System-configured CSS '{}' does not exist.",
+                system_css_path.display()
+            );
+            None
+        }
+    })();
+
+    system_css.or_else(|| {
+        if default_css.exists() {
+            info!(
+                "Falling back to default CSS at '{}'.",
+                default_css.display()
+            );
+            Some(default_css.to_path_buf())
+        } else {
+            None
+        }
+    })
 }
 
 /// Resolves and selects the final CSS path according to the following rules:
@@ -187,8 +207,6 @@ struct SystemConfig {
 // ---------------------------------------------------------------------
 // Theme Loading (Refactored for GTK UI Action Buttons)
 // ---------------------------------------------------------------------
-
-use std::error::Error;
 
 /// A type‑safe, immutable representation of the theme colors.
 /// The TOML file is expected to use hyphenated keys.
@@ -616,11 +634,13 @@ fn index_down(current: usize, total: usize, columns: usize) -> usize {
 }
 
 /// Helper function to calculate the new index when moving left.
+/// Wraps from first button to last.
 fn index_left(current: usize, total: usize) -> usize {
     (current + total - 1) % total
 }
 
 /// Helper function to calculate the new index when moving right.
+/// Wraps from last button to first.
 fn index_right(current: usize, total: usize) -> usize {
     (current + 1) % total
 }
@@ -1112,9 +1132,11 @@ mod tests {
                     columns: 2,
                     buttons: vector![
                         ButtonConfig {
-                            label : "Default".to_string(),
-                            command : "echo default".to_string(),
-                        css_classes: None,widget_name: None,}
+                            label: "Default".to_string(),
+                            command: "echo default".to_string(),
+                            css_classes: None,
+                            widget_name: None,
+                        }
                     ]
                 }
             },
@@ -1141,9 +1163,11 @@ mod tests {
                     columns: 1,
                     buttons: vector![
                         ButtonConfig {
-                            label : "Test".to_string(),
-                            command : "echo test".to_string(),
-                        css_classes: None,widget_name: None,}
+                            label: "Test".to_string(),
+                            command: "echo test".to_string(),
+                            css_classes: None,
+                            widget_name: None,
+                        }
                     ]
                 }
             },
