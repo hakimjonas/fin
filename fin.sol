@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Package>
   <Name>fin</Name>
-  <Version>0.2.24</Version>
+  <Version>0.2.25</Version>
   <Summary>Finë: a simple GTK4-based session controller for Linux desktops</Summary>
   <Description>
     Finë is a GTK4-based logout manager designed for simplicity and ease-of-use on Linux desktops.
