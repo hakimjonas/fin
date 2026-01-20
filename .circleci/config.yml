@@ -176,6 +176,13 @@ jobs:
             sudo aa-status 2>/dev/null || echo "aa-status not available"
             cat /sys/module/apparmor/parameters/enabled 2>/dev/null || echo "AppArmor module status unknown"
 
+            # Disable AppArmor's user namespace profile transition for unconfined processes
+            # Without this, aa-exec --profile=unconfined still gets transitioned to
+            # "unprivileged_userns" profile when creating user namespaces
+            # See dmesg: apparmor="AUDIT" operation="userns_create" target="unprivileged_userns"
+            echo "Disabling AppArmor unprivileged userns restriction for unconfined processes..."
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_unconfined=0
+
             echo "=== User Namespace Settings ==="
             cat /proc/sys/user/max_user_namespaces 2>/dev/null || echo "max_user_namespaces not found"
             cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null || echo "unprivileged_userns_clone not found"
