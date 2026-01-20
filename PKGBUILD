@@ -1,6 +1,6 @@
 # Maintainer: Hakim Jonas Ghoula <hakim@walkthisway.dk>
 pkgname=fin
-pkgver=0.2.28
+pkgver=0.2.29
 pkgrel=1
 pkgdesc="Finë: a simple GTK4-based session controller for Linux desktops"
 arch=('x86_64')
