@@ -168,10 +168,31 @@ jobs:
       - run:
           name: Configure user namespaces
           command: |
-            # Setup subuid/subgid for boulder's containerized builds
+            echo "=== System Info ==="
+            uname -a
+            cat /etc/os-release | head -5
+
+            echo "=== AppArmor Status ==="
+            sudo aa-status 2>/dev/null || echo "aa-status not available"
+            cat /sys/module/apparmor/parameters/enabled 2>/dev/null || echo "AppArmor module status unknown"
+
+            echo "=== User Namespace Settings ==="
+            cat /proc/sys/user/max_user_namespaces 2>/dev/null || echo "max_user_namespaces not found"
+            cat /proc/sys/kernel/unprivileged_userns_clone 2>/dev/null || echo "unprivileged_userns_clone not found"
+
+            echo "=== Setup subuid/subgid ==="
             sudo touch /etc/subuid /etc/subgid
             sudo usermod --add-subuids 1000000-1065535 --add-subgids 1000000-1065535 root
             sudo usermod --add-subuids 1065536-1131071 --add-subgids 1065536-1131071 $(whoami)
+            echo "subuid:"
+            cat /etc/subuid
+            echo "subgid:"
+            cat /etc/subgid
+
+            echo "=== newuidmap/newgidmap ==="
+            which newuidmap newgidmap
+            ls -la /usr/bin/newuidmap /usr/bin/newgidmap
+            getcap /usr/bin/newuidmap /usr/bin/newgidmap 2>/dev/null || echo "getcap not available"
       - run:
           name: Build boulder from source
           command: |
@@ -219,14 +240,26 @@ jobs:
             # Create output directory for .stone packages
             mkdir -p stone-output
 
-            # Run boulder build (--output specifies where .stone files are written)
-            boulder \
+            # Run boulder build with unconfined AppArmor profile
+            # Ubuntu 24.04 has AppArmor restrictions on user namespace operations
+            # that block mount(MS_PRIVATE) inside user namespaces
+            # See: https://discourse.ubuntu.com/t/understanding-apparmor-user-namespace-restriction/58007
+            aa-exec --profile=unconfined -- \
+              boulder \
+              --verbose \
               --data-dir="$HOME/.local/share/boulder/" \
               --config-dir="$HOME/.config/boulder/" \
               --moss-root="$HOME/.cache/boulder/" \
               build \
               --output=stone-output \
-              packaging/aeryn/stone.yaml
+              packaging/aeryn/stone.yaml || {
+                echo "=== Boulder build failed, capturing diagnostics ==="
+                echo "=== dmesg (last 50 lines) ==="
+                sudo dmesg | tail -50 || true
+                echo "=== AppArmor denials ==="
+                sudo dmesg | grep -i apparmor | tail -20 || true
+                exit 1
+              }
 
             # List generated .stone files
             echo "Generated .stone packages:"
