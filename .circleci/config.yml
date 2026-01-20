@@ -176,12 +176,17 @@ jobs:
             sudo aa-status 2>/dev/null || echo "aa-status not available"
             cat /sys/module/apparmor/parameters/enabled 2>/dev/null || echo "AppArmor module status unknown"
 
-            # Disable AppArmor's user namespace profile transition for unconfined processes
-            # Without this, aa-exec --profile=unconfined still gets transitioned to
-            # "unprivileged_userns" profile when creating user namespaces
-            # See dmesg: apparmor="AUDIT" operation="userns_create" target="unprivileged_userns"
-            echo "Disabling AppArmor unprivileged userns restriction for unconfined processes..."
+            # Disable AppArmor's unprivileged user namespace restrictions
+            # Ubuntu 24.04 restricts operations inside user namespaces by default
+            # This causes mount(MS_PRIVATE) to fail with EACCES
+            # See: https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
+            echo "Disabling AppArmor unprivileged userns restrictions..."
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_unconfined=0
+
+            echo "=== Verifying sysctl settings ==="
+            echo "apparmor_restrict_unprivileged_userns: $(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || echo 'not found')"
+            echo "apparmor_restrict_unprivileged_unconfined: $(cat /proc/sys/kernel/apparmor_restrict_unprivileged_unconfined 2>/dev/null || echo 'not found')"
 
             echo "=== User Namespace Settings ==="
             cat /proc/sys/user/max_user_namespaces 2>/dev/null || echo "max_user_namespaces not found"
