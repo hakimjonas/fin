@@ -251,7 +251,7 @@ dependencies = [
 
 [[package]]
 name = "fin"
-version = "0.2.29"
+version = "0.2.30"
 dependencies = [
  "anyhow",
  "clap",
@@ -264,7 +264,7 @@ dependencies = [
  "serde",
  "tempfile",
  "thiserror",
- "toml",
+ "toml 1.1.2+spec-1.1.0",
 ]
 
 [[package]]
