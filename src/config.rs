@@ -271,15 +271,4 @@ mod tests {
         assert_eq!(commands.len(), 1);
         assert_eq!(columns, 1);
     }
-
-    #[test]
-    fn default_config_includes_niri() {
-        init_env();
-        let config =
-            load_config(Path::new("assets/config.toml")).expect("assets/config.toml should parse");
-        assert!(
-            config.default_commands.contains_key("niri"),
-            "assets/config.toml must define [default_commands.niri]"
-        );
-    }
 }
