@@ -7,6 +7,14 @@ use std::path::{Path, PathBuf};
 fn main() -> Result<()> {
     env_logger::init();
 
+    // Default to the OpenGL (GL) renderer to avoid the noisy Vulkan/radv driver
+    // warnings GTK emits when it auto-selects the Vulkan backend, while keeping
+    // GPU compositing for correct CSS/transparency. Honors an explicit user
+    // override via the GSK_RENDERER environment variable.
+    if std::env::var_os("GSK_RENDERER").is_none() {
+        std::env::set_var("GSK_RENDERER", "gl");
+    }
+
     let matches = Command::new("fin")
         .version(env!("CARGO_PKG_VERSION"))
         .about("Finë Application")
@@ -65,6 +73,9 @@ fn main() -> Result<()> {
         }
     });
 
-    app.run();
+    // Run with only argv[0] so the `clap`-consumed `-c`/`--config` flag is not
+    // re-parsed (and rejected) by GTK's `GApplication` command-line handling.
+    let program = std::env::args().next().unwrap_or_else(|| "fin".to_string());
+    app.run_with_args(&[program]);
     Ok(())
 }
