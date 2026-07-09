@@ -98,6 +98,17 @@ buttons = [
     { label = "󰐥", command = "systemctl poweroff", css_classes = ["poweroff-button"], widget_name = "poweroff-button" }
 ]
 
+# Niri: Suspends, locks screen, logs out, reboots, and powers off.
+[default_commands.niri]
+columns = 2
+buttons = [
+    { label = "󰤄", command = "systemctl suspend", css_classes = ["suspend-button"], widget_name = "suspend-button" },
+    { label = "󰌾", command = "loginctl lock-session", css_classes = ["lock-button"], widget_name = "lock-button" },
+    { label = "󰍃", command = "loginctl terminate-session $XDG_SESSION_ID", css_classes = ["logout-button"], widget_name = "logout-button" },
+    { label = "󰜉", command = "systemctl reboot", css_classes = ["reboot-button"], widget_name = "reboot-button" },
+    { label = "󰐥", command = "systemctl poweroff", css_classes = ["poweroff-button"], widget_name = "poweroff-button" }
+]
+
 # Common commands (fallback)
 [default_commands.common]
 columns = 2

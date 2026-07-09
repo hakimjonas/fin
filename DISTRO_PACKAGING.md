@@ -170,6 +170,7 @@ Supported DEs:
 - Budgie
 - XFCE
 - COSMIC
+- Niri
 - Generic fallback
 
 ### Default Commands
